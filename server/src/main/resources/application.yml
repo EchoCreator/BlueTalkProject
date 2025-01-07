@@ -1,0 +1,32 @@
+server:
+  port: 8080
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
+  profiles:
+    active: dev
+  main:
+    allow-circular-references: true
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/comment_project?allowMultiQueries=true
+    username: root
+    password: 623478
+  data:
+    redis:
+      host: localhost
+      port: 6379
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true
+  mapper-locations: classpath:mapper/*.xml
+app:
+  jwt:
+    secret-key: ${app.jwt.secret-key}
+    expiration: ${app.jwt.expiration}
+    token-name: ${app.jwt.token-name}
+  code:
+    expiration: ${app.code.expiration}

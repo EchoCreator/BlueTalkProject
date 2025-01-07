@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.example.server.mapper.CommodityMapper">
+    <select id="getCommodityByType" resultType="com.example.pojo.entity.Commodity">
+        select * from commodity
+        <where>
+            <if test="type!=null and type!=0">
+                type_id=#{type}
+            </if>
+        </where>
+    </select>
+</mapper>

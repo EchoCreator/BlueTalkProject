@@ -26,4 +26,9 @@ public class SystemConstant {
     public static final String REDIS_LOCK_KEY = "lock_key_"; // 互斥锁的前缀（防缓存击穿）
 
     public static final Long REDIS_NULL_EXPIRATION = 1L; // 缓存空值的时间（防缓存穿透），1分钟
+
+    public static final String REDIS_VOUCHER_INFO_KEY = "voucher_info"; // 存储优惠券信息
+    public static final Long REDIS_VOUCHER_INFO_EXPIRATION = 5L; // 5分钟
+
+    public static final String REDIS_USER_VOUCHER_KEY = "user_voucher_"; // 存储优惠券订单
 }

@@ -26,8 +26,8 @@ public class CommodityController {
     }
 
     @GetMapping("/getCommodity")
-    public Result<List<CommodityVO>> getCommodity(String name, Integer type) {
-        List<CommodityVO> list = commodityService.getCommodity(name, type);
+    public Result<List<CommodityVO>> getCommodity(String name, Long typeId) {
+        List<CommodityVO> list = commodityService.getCommodity(name, typeId);
         return Result.success(list);
     }
 

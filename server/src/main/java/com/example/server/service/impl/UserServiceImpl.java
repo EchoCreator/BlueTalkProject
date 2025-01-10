@@ -6,9 +6,11 @@ import com.example.common.constant.SystemConstant;
 import com.example.common.exception.ExpireCodeException;
 import com.example.common.exception.IncorrectCodeException;
 import com.example.common.exception.InvalidPhoneNumberException;
+import com.example.common.exception.NoDataInDBException;
 import com.example.common.properties.CodeProperties;
 import com.example.common.properties.JwtProperties;
 import com.example.common.utils.JwtUtil;
+import com.example.common.utils.RedisUtil;
 import com.example.common.utils.ThreadLocalUtil;
 import com.example.common.utils.ValidateRegExpUtil;
 import com.example.pojo.dto.UserLoginDTO;
@@ -24,6 +26,7 @@ import io.jsonwebtoken.Claims;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.security.SecurityProperties;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -44,11 +47,11 @@ public class UserServiceImpl implements UserService {
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
     @Autowired
-    private RedisTemplate redisTemplate;
-    @Autowired
     private CodeProperties codeProperties;
     @Autowired
     private JwtProperties jwtProperties;
+    @Autowired
+    private RedisUtil redisUtil;
 
     @Override
     public void getCode(String phoneNumber) {
@@ -124,24 +127,14 @@ public class UserServiceImpl implements UserService {
         Claims claims = ThreadLocalUtil.get();
         Long id = Long.valueOf(claims.get(JwtClaimsConstant.ID).toString());
 
-        String key = SystemConstant.REDIS_USER_KEY + id;
-        UserVO userVO = (UserVO) redisTemplate.opsForValue().get(key);
+        User user = this.getUserFromCache(id);
 
-        if (userVO != null) {
-            return userVO;
-        }
-
-        User user = userMapper.getUserById(id);
-        UserInfo userInfo = userInfoMapper.getUserInfoByUserId(id);
+        UserInfo userInfo = this.getUserInfoFromCache(id);
 
         // 计算年龄
-        LocalDate now = LocalDate.now();
-        Integer age = null;
-        if (userInfo.getBirthday() != null) {
-            age = userInfo.getBirthday().until(now).getYears();
-        }
+        Integer age=this.calculateAge(userInfo);
 
-        userVO = UserVO.builder()
+        UserVO userVO = UserVO.builder()
                 .id(user.getId())
                 .phoneNumber(user.getPhoneNumber())
                 .username(user.getUsername())
@@ -157,31 +150,19 @@ public class UserServiceImpl implements UserService {
                 .level(userInfo.getLevel())
                 .build();
 
-        redisTemplate.opsForValue().set(key, userVO, SystemConstant.REDIS_USER_EXPIRATION, TimeUnit.MINUTES);
-
         return userVO;
     }
 
     @Override
     public OtherUserVO getOtherUserInfo(Long id) {
-        String key = SystemConstant.REDIS_OTHER_USER_KEY + id;
-        OtherUserVO otherUserVO = (OtherUserVO) redisTemplate.opsForValue().get(key);
+        User user = this.getUserFromCache(id);
 
-        if (otherUserVO != null) {
-            return otherUserVO;
-        }
-
-        User user = userMapper.getUserById(id);
-        UserInfo userInfo = userInfoMapper.getUserInfoByUserId(id);
+        UserInfo userInfo = this.getUserInfoFromCache(id);
 
         // 计算年龄
-        LocalDate now = LocalDate.now();
-        Integer age = null;
-        if (userInfo.getBirthday() != null) {
-            age = userInfo.getBirthday().until(now).getYears();
-        }
+        Integer age=this.calculateAge(userInfo);
 
-        otherUserVO = OtherUserVO.builder()
+        OtherUserVO otherUserVO = OtherUserVO.builder()
                 .id(user.getId())
                 .username(user.getUsername())
                 .profilePicture(user.getProfilePicture())
@@ -195,8 +176,39 @@ public class UserServiceImpl implements UserService {
                 .level(userInfo.getLevel())
                 .build();
 
-        redisTemplate.opsForValue().set(key, otherUserVO, SystemConstant.REDIS_OTHER_USER_EXPIRATION, TimeUnit.MINUTES);
-
         return otherUserVO;
+    }
+
+    public User getUserByIdFromDB(Long userId) {
+        return userMapper.getUserById(userId);
+    }
+
+    public UserInfo getUserInfoByIdFromDB(Long userId) {
+        return userInfoMapper.getUserInfoByUserId(userId);
+    }
+
+    public User getUserFromCache(Long userId) {
+        User user = redisUtil.queryWithCachePenetration(SystemConstant.REDIS_USER_KEY, userId, User.class, this::getUserByIdFromDB, null, SystemConstant.REDIS_USER_EXPIRATION, TimeUnit.MINUTES);
+        if (user == null) {
+            throw new NoDataInDBException("该用户不存在！");
+        }
+        return user;
+    }
+
+    public UserInfo getUserInfoFromCache(Long userId) {
+        UserInfo userInfo = redisUtil.queryWithCachePenetration(SystemConstant.REDIS_USER_INFO_KEY, userId, UserInfo.class, this::getUserInfoByIdFromDB, null, SystemConstant.REDIS_USER_EXPIRATION, TimeUnit.MINUTES);
+        if (userInfo == null) {
+            throw new NoDataInDBException("该用户信息数据不存在！");
+        }
+        return userInfo;
+    }
+
+    public Integer calculateAge(UserInfo userInfo) {
+        LocalDate now = LocalDate.now();
+        Integer age = null;
+        if (userInfo.getBirthday() != null) {
+            age = userInfo.getBirthday().until(now).getYears();
+        }
+        return age;
     }
 }

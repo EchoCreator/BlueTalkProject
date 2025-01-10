@@ -10,7 +10,7 @@ import java.util.List;
 public interface CommodityService {
     List<CommodityTypeVO> getCommodityType();
 
-    List<CommodityVO> getCommodity(String name, Integer type);
+    List<CommodityVO> getCommodity(String name, Long typeId);
 
     CommodityInfoVO getCommodityInfo(Long commodityId);
 

@@ -13,7 +13,7 @@ public interface CommodityMapper {
     @Select("select * from commodity_type order by sort")
     List<CommodityType> getCommodityType();
 
-    List<Commodity> getCommodityByType(Integer type);
+    List<Commodity> getCommodityByType(Long typeId);
 
     @Select("select * from commodity where id=#{commodityId}")
     Commodity getCommodityById(Long commodityId);

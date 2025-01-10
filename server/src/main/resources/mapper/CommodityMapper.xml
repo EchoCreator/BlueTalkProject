@@ -5,8 +5,8 @@
     <select id="getCommodityByType" resultType="com.example.pojo.entity.Commodity">
         select * from commodity
         <where>
-            <if test="type!=null and type!=0">
-                type_id=#{type}
+            <if test="typeId!=null and typeId!=0">
+                type_id=#{typeId}
             </if>
         </where>
     </select>

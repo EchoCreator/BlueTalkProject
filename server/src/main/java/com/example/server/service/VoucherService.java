@@ -8,4 +8,6 @@ public interface VoucherService {
     List<VoucherInfoVO> getVouchers();
 
     void pickupVoucher(Long voucherId);
+
+    void saveUserVoucher(Long voucherId, Long userId);
 }

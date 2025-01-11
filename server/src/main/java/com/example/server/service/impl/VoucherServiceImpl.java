@@ -7,6 +7,8 @@ import cn.hutool.json.JSONUtil;
 import com.example.common.constant.JwtClaimsConstant;
 import com.example.common.constant.SystemConstant;
 import com.example.common.constant.VoucherOrderConstant;
+import com.example.common.exception.EventEndedException;
+import com.example.common.exception.EventYet2StartException;
 import com.example.common.exception.SeckillVoucherStockEmpty;
 import com.example.common.exception.UserVoucherExist;
 import com.example.common.utils.RedisUtil;
@@ -20,11 +22,12 @@ import com.example.pojo.vo.VoucherInfoVO;
 import com.example.server.mapper.VoucherMapper;
 import com.example.server.service.VoucherService;
 import io.jsonwebtoken.Claims;
+import org.springframework.aop.framework.AopContext;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -37,8 +40,6 @@ public class VoucherServiceImpl implements VoucherService {
     private RedisUtil redisUtil;
     @Autowired
     private UniqueIDGenerator uniqueIDGenerator;
-    @Autowired
-    private StringRedisTemplate stringRedisTemplate;
 
     @Override
     public List<VoucherInfoVO> getVouchers() {
@@ -50,6 +51,8 @@ public class VoucherServiceImpl implements VoucherService {
         if (voucherInfoVOList == null) {
             throw new RuntimeException();
         }
+
+        // 依次当前用户是否已领取优惠券
         for (int i = 0; i < voucherInfoVOList.size(); i++) {
             VoucherInfoVO voucherInfoVO = voucherInfoVOList.get(i);
             UserVoucher userVoucher = voucherMapper.getUserVoucher(voucherInfoVOList.get(i).getId(), userId);
@@ -64,14 +67,22 @@ public class VoucherServiceImpl implements VoucherService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void pickupVoucher(Long voucherId) {
-        Voucher voucher = voucherMapper.getVoucherById(voucherId);
-        UserVoucher userVoucher = new UserVoucher();
-        Long id = uniqueIDGenerator.generateUniqueID(SystemConstant.REDIS_USER_VOUCHER_KEY);
-
         Claims claims = ThreadLocalUtil.get();
         Long userId = Long.valueOf(claims.get(JwtClaimsConstant.ID).toString());
+
+        // 通过synchronized解决用户一次性可以领取多张同一个优惠券的情况，保证一个优惠券每个用户只能领一张
+        synchronized (userId.toString().intern()) {
+            // 获取与事务相关的代理对象，确保saveUserVoucher的事务回滚可以在pickupVoucher函数中生效
+            VoucherService proxy = (VoucherService) AopContext.currentProxy();
+            proxy.saveUserVoucher(voucherId, userId);
+        }
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void saveUserVoucher(Long voucherId, Long userId) {
+        Voucher voucher = voucherMapper.getVoucherById(voucherId);
+        UserVoucher userVoucher = new UserVoucher();
 
         // 检查该用户是否已有该优惠券
         UserVoucher existedUserVoucher = voucherMapper.getUserVoucher(voucherId, userId);
@@ -83,6 +94,12 @@ public class VoucherServiceImpl implements VoucherService {
         // 如果是秒杀优惠券，还需要让其库存减1
         if (voucher.getType() == 1) {
             SeckillVoucher seckillVoucher = voucherMapper.getSeckillVoucherById(voucherId);
+            if (seckillVoucher.getSeckillBeginTime().isAfter(LocalDateTime.now())) {
+                throw new EventYet2StartException("秒杀活动尚未开始！请耐心等待哦");
+            }
+            if (seckillVoucher.getSeckillEndTime().isBefore(LocalDateTime.now())) {
+                throw new EventEndedException("秒杀活动已经结束！再看看别的优惠吧");
+            }
             if (seckillVoucher.getCurrentStock() < 1) {
                 throw new SeckillVoucherStockEmpty("该优惠券已被抢光");
             }
@@ -92,6 +109,7 @@ public class VoucherServiceImpl implements VoucherService {
             }
         }
 
+        Long id = uniqueIDGenerator.generateUniqueID(SystemConstant.REDIS_USER_VOUCHER_KEY);
         userVoucher.setId(id);
         userVoucher.setVoucherId(voucherId);
         userVoucher.setUserId(userId);

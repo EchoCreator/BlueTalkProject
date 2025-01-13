@@ -24,6 +24,7 @@ public class SystemConstant {
     public static final Long REDIS_USER_COMMODITY_EXPIRATION = 5L; // 5分钟
 
     public static final String REDIS_LOCK_KEY = "lock_key_"; // 互斥锁的前缀（防缓存击穿）
+    public static final String REDIS_USER_VOUCHER_LOCK_KEY = "lock_user_voucher_key_"; // redisson锁相同用户领取优惠券的前缀
 
     public static final Long REDIS_NULL_EXPIRATION = 1L; // 缓存空值的时间（防缓存穿透），1分钟
 
@@ -31,4 +32,7 @@ public class SystemConstant {
     public static final Long REDIS_VOUCHER_INFO_EXPIRATION = 5L; // 5分钟
 
     public static final String REDIS_USER_VOUCHER_KEY = "user_voucher_"; // 存储优惠券订单
+
+    public static final String REDIS_LUA_VOUCHER_STOCK_KEY = "pickUpVoucher_stock_"; // 通过lua脚本存储秒杀优惠券库存
+    public static final String REDIS_LUA_USER_VOUCHER_KEY = "pickUpVoucher_userVoucher_"; // 通过lua脚本存储领取某一优惠券的用户set
 }

@@ -213,7 +213,9 @@ public class RedisUtil {
         return data;
     }
 
-    // 线程池，创建10个线程
+    /*线程池，创建10个线程
+    （用于缓存击穿问题中拿到锁的用户线程开辟一条新的线程，
+    从数据库中获取新数据更新redis中的信息）*/
     private static final ExecutorService CACHE_REBUILD_EXECUTOR = Executors.newFixedThreadPool(10);
 
     // 获取互斥锁

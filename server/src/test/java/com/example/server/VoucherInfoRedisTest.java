@@ -19,10 +19,18 @@ public class VoucherInfoRedisTest {
     private RedisUtil redisUtil;
     @Autowired
     private VoucherServiceImpl voucherService;
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
 
     @Test
     public void test() {
         List<VoucherInfoVO> list = voucherService.getVoucherInfoFromDB();
         redisUtil.setWithLogicalExpire(SystemConstant.REDIS_VOUCHER_INFO_KEY, list, SystemConstant.REDIS_VOUCHER_INFO_EXPIRATION, TimeUnit.MINUTES);
+
+        for (VoucherInfoVO v : list) {
+            if (v.getType() == 1) {
+                stringRedisTemplate.opsForValue().set(SystemConstant.REDIS_LUA_VOUCHER_STOCK_KEY + v.getId(), v.getStock().toString());
+            }
+        }
     }
 }

@@ -15,6 +15,7 @@ public class UserVoucher {
     private Long userId;
     private Long voucherId;
     private Integer status;
+    private Integer type;
     @JsonFormat(pattern = "yyyy/MM/dd HH:mm:ss")
     private LocalDateTime createTime;
     @JsonFormat(pattern = "yyyy/MM/dd HH:mm:ss")

@@ -146,14 +146,14 @@ public class VoucherServiceImpl implements VoucherService {
             if (v.getId().equals(voucherId)) {
                 voucherType = v.getType();
                 // 如果是秒杀券，判断是否在秒杀时间内
-//                if (v.getType() == 1) {
-//                    if (v.getSeckillBeginTime().isAfter(LocalDateTime.now())) {
-//                        throw new EventYet2StartException("秒杀活动尚未开始！请耐心等待哦");
-//                    }
-//                    if (v.getSeckillEndTime().isBefore(LocalDateTime.now())) {
-//                        throw new EventEndedException("秒杀活动已经结束！再看看别的优惠吧");
-//                    }
-//                }
+                if (v.getType() == 1) {
+                    if (v.getSeckillBeginTime().isAfter(LocalDateTime.now())) {
+                        throw new EventYet2StartException("秒杀活动尚未开始！请耐心等待哦");
+                    }
+                    if (v.getSeckillEndTime().isBefore(LocalDateTime.now())) {
+                        throw new EventEndedException("秒杀活动已经结束！再看看别的优惠吧");
+                    }
+                }
                 break;
             }
         }

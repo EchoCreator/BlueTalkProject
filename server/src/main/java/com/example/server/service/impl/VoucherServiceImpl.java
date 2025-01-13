@@ -1,5 +1,6 @@
 package com.example.server.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.example.common.constant.JwtClaimsConstant;
 import com.example.common.constant.SystemConstant;
 import com.example.common.constant.UserVoucherConstant;
@@ -21,17 +22,21 @@ import jakarta.annotation.PostConstruct;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.redis.connection.stream.*;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 
 @Service
@@ -65,7 +70,8 @@ public class VoucherServiceImpl implements VoucherService {
     /*阻塞队列（用户领取优惠券后，把领取该优惠券的信息保存在队列中，
     方便异步往数据库中添加同时不妨碍领取优惠券尤其是秒杀优惠券的进程）*/
     private BlockingQueue<UserVoucher> userVoucherTasks = new ArrayBlockingQueue<>(1024 * 1024);
-    // 线程池（线程池）
+
+    // 线程池
     private static final ExecutorService USER_VOUCHER_EXECUTOR = Executors.newSingleThreadExecutor();
 
     // 线程任务
@@ -74,10 +80,76 @@ public class VoucherServiceImpl implements VoucherService {
         public void run() {
             while (true) {
                 try {
-                    UserVoucher userVoucher = userVoucherTasks.take();
+                    // 获取阻塞队列中的userVoucher信息（以替换为消息队列）
+                    // UserVoucher userVoucher = userVoucherTasks.take();
+
+                    // 获取消息队列中的userVoucher信息
+                    // XREADGROUP GROUP group1 consumer1 COUNT 1 BLOCK 2000 STREAMS stream_userVouchers >
+                    // 因为消息队列中的消息是群发的，该命令表示group1的consumer1要从消息队列stream_userVouchers中读取最近一条未消费（未读或未被确认）的消息，阻塞时间为2s，如果2s后没有读取到则重新尝试读取消息
+                    List<MapRecord<String, Object, Object>> list = stringRedisTemplate.opsForStream().read(
+                            Consumer.from("group1", "consumer1"),
+                            StreamReadOptions.empty().count(1).block(Duration.ofSeconds(2)),
+                            StreamOffset.create(SystemConstant.REDIS_LUA_STREAM_USER_VOUCHER, ReadOffset.lastConsumed())
+                    );
+
+                    // 判断消息是否获取成功，如果获取失败，则continue重新尝试获取
+                    if (list == null || list.isEmpty()) {
+                        continue;
+                    }
+
+                    // 从消息中解析出userVoucher
+                    MapRecord<String, Object, Object> record = list.get(0);
+                    Map<Object, Object> map = record.getValue();
+                    UserVoucher userVoucher = BeanUtil.fillBeanWithMap(map, new UserVoucher(), true);
+
+                    // 将userVoucher添加到数据库
                     handleUserVoucher(userVoucher);
+
+                    // 该消息已读，确认该消息
+                    stringRedisTemplate.opsForStream().acknowledge(SystemConstant.REDIS_LUA_STREAM_USER_VOUCHER, "group1", record.getId());
                 } catch (Exception e) {
-                    throw new RuntimeException(e);
+                    // 如果在处理消息的过程中（如添加到数据库中）抛出了异常，就不会进入到确认步骤，消息就会被放在pending-list中，此时需要从pending-list中尝试取出消息
+                    handlePendingList();
+                }
+            }
+        }
+    }
+
+    // 从pending-list中尝试取出消息
+    private void handlePendingList() {
+        while (true) {
+            try {
+                // 获取pending-list中的userVoucher信息
+                // XREADGROUP GROUP group1 consumer1 COUNT 1 STREAMS stream_userVouchers 0
+                // 没有阻塞时间是因为pending-list一定有未被ack的消息
+                // offset 0表示获取消息队列中的第一条消息
+                List<MapRecord<String, Object, Object>> list = stringRedisTemplate.opsForStream().read(
+                        Consumer.from("group1", "consumer1"),
+                        StreamReadOptions.empty().count(1),
+                        StreamOffset.create(SystemConstant.REDIS_LUA_STREAM_USER_VOUCHER, ReadOffset.from("0"))
+                );
+
+                // 判断消息是否获取成功，如果获取失败，说明pending-list中已经没有了消息，结束循环
+                if (list == null || list.isEmpty()) {
+                    break;
+                }
+
+                // 从消息中解析出userVoucher
+                MapRecord<String, Object, Object> record = list.get(0);
+                Map<Object, Object> map = record.getValue();
+                UserVoucher userVoucher = BeanUtil.fillBeanWithMap(map, new UserVoucher(), true);
+
+                // 将userVoucher添加到数据库
+                handleUserVoucher(userVoucher);
+
+                // 该消息已读，确认该消息
+                stringRedisTemplate.opsForStream().acknowledge(SystemConstant.REDIS_LUA_STREAM_USER_VOUCHER, "group1", record.getId());
+            } catch (Exception e) {
+                // 为了防止抛出异常时频繁进入handlePendingList的循环，设置20ms的休眠时间
+                try {
+                    Thread.sleep(20);
+                } catch (InterruptedException ex) {
+                    throw new RuntimeException(ex);
                 }
             }
         }
@@ -132,6 +204,8 @@ public class VoucherServiceImpl implements VoucherService {
 
     @Override
     public void pickupVoucher(Long voucherId) {
+        Long id = uniqueIDGenerator.generateUniqueID(SystemConstant.REDIS_USER_VOUCHER_KEY);
+
         Claims claims = ThreadLocalUtil.get();
         Long userId = Long.valueOf(claims.get(JwtClaimsConstant.ID).toString());
 
@@ -165,7 +239,7 @@ public class VoucherServiceImpl implements VoucherService {
         Long result = stringRedisTemplate.execute(
                 PICKUP_VOUCHER_SCRIPT,
                 Collections.emptyList(),
-                voucherId.toString(), userId.toString(), voucherType.toString()
+                id.toString(), voucherId.toString(), userId.toString(), voucherType.toString()
         );
 
         assert result != null;
@@ -178,15 +252,17 @@ public class VoucherServiceImpl implements VoucherService {
             throw new UserVoucherExist("您已有该优惠券，不可重复领取！");
         }
 
-        // 为0说明该用户可以正常领取该优惠券，把下单信息储存到阻塞队列
-        UserVoucher userVoucher = new UserVoucher();
+        // 为0说明该用户可以正常领取该优惠券，并且已将userVoucher信息发送到了消息队列（这里为了性能淘汰掉了阻塞队列）
+
+        // 为0说明该用户可以正常领取该优惠券，把userVoucher信息储存到阻塞队列
+        /*UserVoucher userVoucher = new UserVoucher();
         Long id = uniqueIDGenerator.generateUniqueID(SystemConstant.REDIS_USER_VOUCHER_KEY);
         userVoucher.setId(id);
         userVoucher.setVoucherId(voucherId);
         userVoucher.setUserId(userId);
         userVoucher.setStatus(UserVoucherConstant.VOUCHER_STATUS_UNUSED);
         userVoucher.setType(voucherType);
-        userVoucherTasks.add(userVoucher);
+        userVoucherTasks.add(userVoucher);*/
 
         // 获取代理对象
         proxy = (VoucherService) AopContext.currentProxy();
@@ -202,7 +278,7 @@ public class VoucherServiceImpl implements VoucherService {
             throw new UserVoucherExist("您已有该优惠券，不可重复领取！");
         }
 
-        // 如果是秒杀优惠券，还需要让其库存减1
+        // 如果是秒杀优惠券，还需要让其库存-1
         if (userVoucher.getType() == 1) {
             SeckillVoucher seckillVoucher = voucherMapper.getSeckillVoucherById(voucherId);
             if (seckillVoucher.getCurrentStock() < 1) {
@@ -214,47 +290,9 @@ public class VoucherServiceImpl implements VoucherService {
             }
         }
 
+        userVoucher.setStatus(UserVoucherConstant.VOUCHER_STATUS_UNUSED);
         voucherMapper.addUserVoucher(userVoucher);
     }
-
-//    @Transactional(rollbackFor = Exception.class)
-//    public void saveUserVoucher(Long voucherId, Long userId) {
-//        Voucher voucher = voucherMapper.getVoucherById(voucherId);
-//        UserVoucher userVoucher = new UserVoucher();
-//
-//        // 检查该用户是否已有该优惠券
-//        UserVoucher existedUserVoucher = voucherMapper.getUserVoucher(voucherId, userId);
-//        if (existedUserVoucher != null) {
-//            throw new UserVoucherExist("您已有该优惠券，不可重复领取！");
-//        }
-//
-//
-//        // 如果是秒杀优惠券，还需要让其库存减1
-//        if (voucher.getType() == 1) {
-//            SeckillVoucher seckillVoucher = voucherMapper.getSeckillVoucherById(voucherId);
-//            if (seckillVoucher.getSeckillBeginTime().isAfter(LocalDateTime.now())) {
-//                throw new EventYet2StartException("秒杀活动尚未开始！请耐心等待哦");
-//            }
-//            if (seckillVoucher.getSeckillEndTime().isBefore(LocalDateTime.now())) {
-//                throw new EventEndedException("秒杀活动已经结束！再看看别的优惠吧");
-//            }
-//            if (seckillVoucher.getCurrentStock() < 1) {
-//                throw new SeckillVoucherStockEmpty("该优惠券已被抢光");
-//            }
-//            Boolean success = voucherMapper.setSeckillVoucherCurrentStock(voucherId);
-//            if (!success) {
-//                throw new SeckillVoucherStockEmpty("该优惠券已被抢光");
-//            }
-//        }
-//
-//        Long id = uniqueIDGenerator.generateUniqueID(SystemConstant.REDIS_USER_VOUCHER_KEY);
-//        userVoucher.setId(id);
-//        userVoucher.setVoucherId(voucherId);
-//        userVoucher.setUserId(userId);
-//        userVoucher.setStatus(VoucherOrderConstant.VOUCHER_STATUS_UNUSED);
-//
-//        voucherMapper.addUserVoucher(userVoucher);
-//    }
 
     public List<VoucherInfoVO> getVoucherInfoFromDB() {
         List<VoucherInfoVO> voucherInfoVOList = new ArrayList<>();

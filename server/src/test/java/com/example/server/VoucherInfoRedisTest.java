@@ -24,6 +24,8 @@ public class VoucherInfoRedisTest {
 
     @Test
     public void test() {
+        // 注意：通过redis的Stream实现消息队列还需要通过XGROUP CREATE stream_userVouchers group1 0 MKSTREAM命令生成名为stream_userVouchers的消息队列和名为group1的组
+
         List<VoucherInfoVO> list = voucherService.getVoucherInfoFromDB();
         redisUtil.setWithLogicalExpire(SystemConstant.REDIS_VOUCHER_INFO_KEY, list, SystemConstant.REDIS_VOUCHER_INFO_EXPIRATION, TimeUnit.MINUTES);
 

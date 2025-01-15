@@ -36,4 +36,11 @@ public class SystemConstant {
     public static final String REDIS_LUA_VOUCHER_STOCK_KEY = "pickUpVoucher_stock_"; // 通过lua脚本存储秒杀优惠券库存
     public static final String REDIS_LUA_USER_VOUCHER_KEY = "pickUpVoucher_userVoucher_"; // 通过lua脚本存储领取某一优惠券的用户set
     public static final String REDIS_LUA_STREAM_USER_VOUCHER = "stream_userVouchers"; // 通过lua脚本向名为stream_userVoucher的消息队列添加userVoucher信息
+
+    public static final String REDIS_BLOGS_KEY = "blogs"; // 存储帖子列表
+    public static final Long REDIS_BLOGS_EXPIRATION = 5L; // 5分钟
+
+    public static final String REDIS_BLOG_COMMENTS_KEY = "blog_comments_"; // 存储单个帖子的一级评论列表
+    public static final String REDIS_BLOG_CHILDREN_COMMENTS_KEY = "blog_children_comments_"; // 存储单个帖子的一级评论的回复列表
+    public static final Long REDIS_BLOG_COMMENTS_EXPIRATION = 5L; // 5分钟
 }

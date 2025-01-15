@@ -22,6 +22,7 @@ import java.time.LocalDateTime;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -105,6 +106,37 @@ public class RedisUtil {
 
         // 若缓存中没有（null），则向数据库中查找
         List<T> data = (field != null) ? getDataFromDB.apply(field) : getDataFromDBWithoutParam.get();
+
+        // 若数据库中不存在，则向redis中保存空值，并且返回null
+        if (data == null) {
+            this.set(key, "", SystemConstant.REDIS_NULL_EXPIRATION, TimeUnit.MINUTES);
+            return null;
+        }
+
+        // 若数据库中存在，则将数据保存在redis中并返回数据
+        this.set(key, JSONUtil.toJsonStr(data), expire, timeUnit);
+        return data;
+    }
+
+    public <T, Field1, Field2> List<T> queryListWithCachePenetration(String keyPrefix, Field1 field1, Field2 field2, Class<T> type, BiFunction<Field1, Field2, List<T>> getDataFromDB, Long expire, TimeUnit timeUnit) {
+        String key = keyPrefix + field1 + "_" + field2;
+
+        // 从redis中查询缓存
+        String jsonStr = stringRedisTemplate.opsForValue().get(key);
+
+        // 若缓存中存在且不是空值和null，则直接返回数据
+        if (StrUtil.isNotBlank(jsonStr)) {
+            JSONArray jsonArray = JSONUtil.parseArray(jsonStr);
+            return JSONUtil.toList(jsonArray, type);
+        }
+
+        // 若缓存中存放的是空值，说明数据库中不存在该数据，返回null
+        if (jsonStr != null) {
+            return null;
+        }
+
+        // 若缓存中没有（null），则向数据库中查找
+        List<T> data = getDataFromDB.apply(field1, field2);
 
         // 若数据库中不存在，则向redis中保存空值，并且返回null
         if (data == null) {

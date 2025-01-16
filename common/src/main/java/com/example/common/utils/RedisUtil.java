@@ -6,6 +6,8 @@ import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.example.common.constant.SystemConstant;
+import com.example.common.result.QueryRedisListResult;
+import com.example.common.result.QueryRedisResult;
 import com.example.pojo.vo.RedisDataVO;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -57,7 +59,7 @@ public class RedisUtil {
 
     /*解决缓存穿透（请求数据库没有的数据会在redis中保存空值）*/
     /*Function<Field, T> getDataFromDB中Field是参数，T是返回值；而Supplier<T> getDataFromDBWithoutParam是范围值为T的无参函数*/
-    public <T, Field> T queryWithCachePenetration(String keyPrefix, Field field, Class<T> type, Function<Field, T> getDataFromDB, Supplier<T> getDataFromDBWithoutParam, Long expire, TimeUnit timeUnit) {
+    public <T, Field> QueryRedisResult<T> queryWithCachePenetration(String keyPrefix, Field field, Class<T> type, Function<Field, T> getDataFromDB, Supplier<T> getDataFromDBWithoutParam, Long expire, TimeUnit timeUnit) {
         String key = (field != null) ? keyPrefix + field : keyPrefix;
 
         // 从redis中查询缓存
@@ -65,7 +67,7 @@ public class RedisUtil {
 
         // 若缓存中存在且不是空值和null，则直接返回数据
         if (StrUtil.isNotBlank(jsonStr)) {
-            return JSONUtil.toBean(jsonStr, type);
+            return new QueryRedisResult<>(JSONUtil.toBean(jsonStr, type), false);
         }
 
         // 若缓存中存放的是空值，说明数据库中不存在该数据，返回null
@@ -84,10 +86,10 @@ public class RedisUtil {
 
         // 若数据库中存在，则将数据保存在redis中并返回数据
         this.set(key, JSONUtil.toJsonStr(data), expire, timeUnit);
-        return data;
+        return new QueryRedisResult<>(data, true);
     }
 
-    public <T, Field> List<T> queryListWithCachePenetration(String keyPrefix, Field field, Class<T> type, Function<Field, List<T>> getDataFromDB, Supplier<List<T>> getDataFromDBWithoutParam, Long expire, TimeUnit timeUnit) {
+    public <T, Field> QueryRedisListResult<T> queryListWithCachePenetration(String keyPrefix, Field field, Class<T> type, Function<Field, List<T>> getDataFromDB, Supplier<List<T>> getDataFromDBWithoutParam, Long expire, TimeUnit timeUnit) {
         String key = (field != null) ? keyPrefix + field : keyPrefix;
 
         // 从redis中查询缓存
@@ -96,7 +98,7 @@ public class RedisUtil {
         // 若缓存中存在且不是空值和null，则直接返回数据
         if (StrUtil.isNotBlank(jsonStr)) {
             JSONArray jsonArray = JSONUtil.parseArray(jsonStr);
-            return JSONUtil.toList(jsonArray, type);
+            return new QueryRedisListResult<>(JSONUtil.toList(jsonArray, type), false);
         }
 
         // 若缓存中存放的是空值，说明数据库中不存在该数据，返回null
@@ -115,10 +117,10 @@ public class RedisUtil {
 
         // 若数据库中存在，则将数据保存在redis中并返回数据
         this.set(key, JSONUtil.toJsonStr(data), expire, timeUnit);
-        return data;
+        return new QueryRedisListResult<>(data, true);
     }
 
-    public <T, Field1, Field2> List<T> queryListWithCachePenetration(String keyPrefix, Field1 field1, Field2 field2, Class<T> type, BiFunction<Field1, Field2, List<T>> getDataFromDB, Long expire, TimeUnit timeUnit) {
+    public <T, Field1, Field2> QueryRedisListResult<T> queryListWithCachePenetration(String keyPrefix, Field1 field1, Field2 field2, Class<T> type, BiFunction<Field1, Field2, List<T>> getDataFromDB, Long expire, TimeUnit timeUnit) {
         String key = keyPrefix + field1 + "_" + field2;
 
         // 从redis中查询缓存
@@ -127,7 +129,7 @@ public class RedisUtil {
         // 若缓存中存在且不是空值和null，则直接返回数据
         if (StrUtil.isNotBlank(jsonStr)) {
             JSONArray jsonArray = JSONUtil.parseArray(jsonStr);
-            return JSONUtil.toList(jsonArray, type);
+            return new QueryRedisListResult<>(JSONUtil.toList(jsonArray, type), false);
         }
 
         // 若缓存中存放的是空值，说明数据库中不存在该数据，返回null
@@ -146,7 +148,7 @@ public class RedisUtil {
 
         // 若数据库中存在，则将数据保存在redis中并返回数据
         this.set(key, JSONUtil.toJsonStr(data), expire, timeUnit);
-        return data;
+        return new QueryRedisListResult<>(data, true);
     }
 
     /*解决缓存击穿*/

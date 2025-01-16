@@ -9,4 +9,8 @@
                 #{createTime},
                 #{updateTime})
     </insert>
+    <insert id="postBlog" useGeneratedKeys="true" keyProperty="id">
+        insert into blog(user_id, title, images, content, tags, likes, favorites, comments, create_time, update_time)
+        values (#{userId}, #{title}, #{images}, #{content}, #{tags}, #{likes}, #{favorites}, #{comments}, now(), now())
+    </insert>
 </mapper>

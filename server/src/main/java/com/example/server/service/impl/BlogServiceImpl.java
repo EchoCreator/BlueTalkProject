@@ -3,9 +3,11 @@ package com.example.server.service.impl;
 import com.example.common.constant.BlogCommentsConstant;
 import com.example.common.constant.JwtClaimsConstant;
 import com.example.common.constant.SystemConstant;
+import com.example.common.result.QueryRedisListResult;
 import com.example.common.utils.RedisUtil;
 import com.example.common.utils.ThreadLocalUtil;
 import com.example.pojo.dto.BlogCommentsDTO;
+import com.example.pojo.dto.BlogDTO;
 import com.example.pojo.entity.Blog;
 import com.example.pojo.entity.BlogComments;
 import com.example.pojo.vo.*;
@@ -37,30 +39,14 @@ public class BlogServiceImpl implements BlogService {
         Long userId = Long.valueOf(claims.get(JwtClaimsConstant.ID).toString());
 
         String blogsKey = SystemConstant.REDIS_BLOGS_KEY;
-        List<Blog> blogList = redisUtil.queryListWithCachePenetration(blogsKey, null, Blog.class, null, this::getBlogsFromDB, SystemConstant.REDIS_BLOGS_EXPIRATION, TimeUnit.MINUTES);
+        List<Blog> blogList = redisUtil.queryListWithCachePenetration(blogsKey, null, Blog.class, null, this::getBlogsFromDB, SystemConstant.REDIS_BLOGS_EXPIRATION, TimeUnit.MINUTES).getData();
         List<BlogVO> blogVOList = new ArrayList<>();
         for (Blog b : blogList) {
             OtherUserVO otherUserVO = userServiceImpl.getOtherUserInfo(b.getUserId());
             Integer isLiked = blogMapper.isLiked(userId, b.getId());
             Integer isFavorite = blogMapper.isFavorite(userId, b.getId());
 
-            BlogVO blogVO = BlogVO.builder()
-                    .id(b.getId())
-                    .userId(b.getUserId())
-                    .username(otherUserVO.getUsername())
-                    .profilePicture(otherUserVO.getProfilePicture())
-                    .title(b.getTitle())
-                    .content(b.getContent())
-                    .images(b.getImages())
-                    .tags(b.getTags())
-                    .likes(b.getLikes())
-                    .favorites(b.getFavorites())
-                    .isLiked(isLiked)
-                    .IsFavorite(isFavorite)
-                    .comments(b.getComments())
-                    .createdTime(b.getCreatedTime())
-                    .updatedTime(b.getUpdatedTime())
-                    .build();
+            BlogVO blogVO = BlogVO.builder().id(b.getId()).userId(b.getUserId()).username(otherUserVO.getUsername()).profilePicture(otherUserVO.getProfilePicture()).title(b.getTitle()).content(b.getContent()).images(b.getImages()).tags(b.getTags()).address(b.getAddress()).likes(b.getLikes()).favorites(b.getFavorites()).isLiked(isLiked).IsFavorite(isFavorite).comments(b.getComments()).createTime(b.getCreateTime()).updateTime(b.getUpdateTime()).build();
             blogVOList.add(blogVO);
         }
         return blogVOList;
@@ -72,7 +58,7 @@ public class BlogServiceImpl implements BlogService {
         Long userId = Long.valueOf(claims.get(JwtClaimsConstant.ID).toString());
 
         String blogsKey = SystemConstant.REDIS_BLOGS_KEY;
-        List<Blog> blogList = redisUtil.queryListWithCachePenetration(blogsKey, null, Blog.class, null, this::getBlogsFromDB, SystemConstant.REDIS_BLOGS_EXPIRATION, TimeUnit.MINUTES);
+        List<Blog> blogList = redisUtil.queryListWithCachePenetration(blogsKey, null, Blog.class, null, this::getBlogsFromDB, SystemConstant.REDIS_BLOGS_EXPIRATION, TimeUnit.MINUTES).getData();
         BlogVO blogVO = new BlogVO();
         for (Blog b : blogList) {
             if (blogId.equals(b.getId())) {
@@ -81,37 +67,21 @@ public class BlogServiceImpl implements BlogService {
                 Integer isLiked = blogMapper.isLiked(userId, b.getId());
                 Integer isFavorite = blogMapper.isFavorite(userId, b.getId());
 
-                blogVO = BlogVO.builder()
-                        .id(b.getId())
-                        .userId(b.getUserId())
-                        .username(otherUserVO.getUsername())
-                        .profilePicture(otherUserVO.getProfilePicture())
-                        .title(b.getTitle())
-                        .content(b.getContent())
-                        .images(b.getImages())
-                        .tags(b.getTags())
-                        .likes(b.getLikes())
-                        .favorites(b.getFavorites())
-                        .isLiked(isLiked)
-                        .IsFavorite(isFavorite)
-                        .comments(b.getComments())
-                        .createdTime(b.getCreatedTime())
-                        .updatedTime(b.getUpdatedTime())
-                        .build();
+                blogVO = BlogVO.builder().id(b.getId()).userId(b.getUserId()).username(otherUserVO.getUsername()).profilePicture(otherUserVO.getProfilePicture()).title(b.getTitle()).content(b.getContent()).images(b.getImages()).tags(b.getTags()).address(b.getAddress()).likes(b.getLikes()).favorites(b.getFavorites()).isLiked(isLiked).IsFavorite(isFavorite).comments(b.getComments()).createTime(b.getCreateTime()).updateTime(b.getUpdateTime()).build();
                 break;
             }
         }
 
         String blogCommentsKey = SystemConstant.REDIS_BLOG_COMMENTS_KEY;
         String blogChildrenCommentsKey = SystemConstant.REDIS_BLOG_CHILDREN_COMMENTS_KEY;
-        List<BlogComments> blogCommentsList = redisUtil.queryListWithCachePenetration(blogCommentsKey, blogId, BlogComments.class, this::getParentBlogCommentsFromDB, null, SystemConstant.REDIS_BLOG_COMMENTS_EXPIRATION, TimeUnit.MINUTES);
+        List<BlogComments> blogCommentsList = redisUtil.queryListWithCachePenetration(blogCommentsKey, blogId, BlogComments.class, this::getParentBlogCommentsFromDB, null, SystemConstant.REDIS_BLOG_COMMENTS_EXPIRATION, TimeUnit.MINUTES).getData();
         List<BlogCommentsVO> blogCommentsVOList = new ArrayList<>();
 
         for (BlogComments b : blogCommentsList) {
             OtherUserVO otherUserVO = userServiceImpl.getOtherUserInfo(b.getUserId());
 
             // 获取二级评论
-            List<BlogComments> blogChildrenCommentsList = redisUtil.queryListWithCachePenetration(blogChildrenCommentsKey, blogId, b.getId(), BlogComments.class, this::getChildrenBlogCommentsFromDB, SystemConstant.REDIS_BLOG_COMMENTS_EXPIRATION, TimeUnit.MINUTES);
+            List<BlogComments> blogChildrenCommentsList = redisUtil.queryListWithCachePenetration(blogChildrenCommentsKey, blogId, b.getId(), BlogComments.class, this::getChildrenBlogCommentsFromDB, SystemConstant.REDIS_BLOG_COMMENTS_EXPIRATION, TimeUnit.MINUTES).getData();
             List<BlogCommentsVO> blogChildrenCommentsVOList = new ArrayList<>();
 
             if (blogChildrenCommentsList != null && !blogChildrenCommentsList.isEmpty()) {
@@ -121,47 +91,16 @@ public class BlogServiceImpl implements BlogService {
                     if (cb.getReplyId() != 0) {
                         replyUserVO = userServiceImpl.getOtherUserInfo(cb.getReplyUserId());
                     }
-                    BlogCommentsVO blogCommentsVO = BlogCommentsVO.builder()
-                            .id(cb.getId())
-                            .blogId(cb.getBlogId())
-                            .userId(cb.getUserId())
-                            .parentId(cb.getParentId())
-                            .replyId(cb.getReplyId())
-                            .replyUserId(cb.getReplyUserId())
-                            .replyUsername(replyUserVO.getUsername())
-                            .username(postUserVO.getUsername())
-                            .profilePicture(postUserVO.getProfilePicture())
-                            .content(cb.getContent())
-                            .likes(cb.getLikes())
-                            .status(cb.getStatus())
-                            .createTime(cb.getCreateTime())
-                            .updateTime(cb.getUpdateTime())
-                            .build();
+                    BlogCommentsVO blogCommentsVO = BlogCommentsVO.builder().id(cb.getId()).blogId(cb.getBlogId()).userId(cb.getUserId()).parentId(cb.getParentId()).replyId(cb.getReplyId()).replyUserId(cb.getReplyUserId()).replyUsername(replyUserVO.getUsername()).username(postUserVO.getUsername()).profilePicture(postUserVO.getProfilePicture()).content(cb.getContent()).likes(cb.getLikes()).status(cb.getStatus()).createTime(cb.getCreateTime()).updateTime(cb.getUpdateTime()).build();
                     blogChildrenCommentsVOList.add(blogCommentsVO);
                 }
             }
 
-            BlogCommentsVO blogCommentsVO = BlogCommentsVO.builder()
-                    .id(b.getId())
-                    .blogId(b.getBlogId())
-                    .userId(b.getUserId())
-                    .parentId(b.getParentId())
-                    .replyId(b.getReplyId())
-                    .username(otherUserVO.getUsername())
-                    .profilePicture(otherUserVO.getProfilePicture())
-                    .content(b.getContent())
-                    .likes(b.getLikes())
-                    .status(b.getStatus())
-                    .childrenComments(blogChildrenCommentsVOList)
-                    .createTime(b.getCreateTime())
-                    .updateTime(b.getUpdateTime())
-                    .build();
+            BlogCommentsVO blogCommentsVO = BlogCommentsVO.builder().id(b.getId()).blogId(b.getBlogId()).userId(b.getUserId()).parentId(b.getParentId()).replyId(b.getReplyId()).username(otherUserVO.getUsername()).profilePicture(otherUserVO.getProfilePicture()).content(b.getContent()).likes(b.getLikes()).status(b.getStatus()).childrenComments(blogChildrenCommentsVOList).createTime(b.getCreateTime()).updateTime(b.getUpdateTime()).build();
             blogCommentsVOList.add(blogCommentsVO);
         }
 
-        BlogContentVO blogContentVO = BlogContentVO.builder()
-                .blog(blogVO)
-                .comments(blogCommentsVOList).build();
+        BlogContentVO blogContentVO = BlogContentVO.builder().blog(blogVO).comments(blogCommentsVOList).build();
         return blogContentVO;
     }
 
@@ -171,7 +110,7 @@ public class BlogServiceImpl implements BlogService {
         Long myUserId = Long.valueOf(claims.get(JwtClaimsConstant.ID).toString());
 
         String blogsKey = SystemConstant.REDIS_BLOGS_KEY;
-        List<Blog> blogList = redisUtil.queryListWithCachePenetration(blogsKey, null, Blog.class, null, this::getBlogsFromDB, SystemConstant.REDIS_BLOGS_EXPIRATION, TimeUnit.MINUTES);
+        List<Blog> blogList = redisUtil.queryListWithCachePenetration(blogsKey, null, Blog.class, null, this::getBlogsFromDB, SystemConstant.REDIS_BLOGS_EXPIRATION, TimeUnit.MINUTES).getData();
         List<BlogVO> blogVOList = new ArrayList<>();
 
         OtherUserVO user = userServiceImpl.getOtherUserInfo(userId);
@@ -180,23 +119,7 @@ public class BlogServiceImpl implements BlogService {
                 Integer isLiked = blogMapper.isLiked(myUserId, b.getId());
                 Integer isFavorite = blogMapper.isFavorite(myUserId, b.getId());
 
-                BlogVO blogVO = BlogVO.builder()
-                        .id(b.getId())
-                        .userId(b.getUserId())
-                        .username(user.getUsername())
-                        .profilePicture(user.getProfilePicture())
-                        .title(b.getTitle())
-                        .content(b.getContent())
-                        .images(b.getImages())
-                        .tags(b.getTags())
-                        .likes(b.getLikes())
-                        .favorites(b.getFavorites())
-                        .isLiked(isLiked)
-                        .IsFavorite(isFavorite)
-                        .comments(b.getComments())
-                        .createdTime(b.getCreatedTime())
-                        .updatedTime(b.getUpdatedTime())
-                        .build();
+                BlogVO blogVO = BlogVO.builder().id(b.getId()).userId(b.getUserId()).username(user.getUsername()).profilePicture(user.getProfilePicture()).title(b.getTitle()).content(b.getContent()).images(b.getImages()).tags(b.getTags()).address(b.getAddress()).likes(b.getLikes()).favorites(b.getFavorites()).isLiked(isLiked).IsFavorite(isFavorite).comments(b.getComments()).createTime(b.getCreateTime()).updateTime(b.getUpdateTime()).build();
                 blogVOList.add(blogVO);
             }
         }
@@ -210,7 +133,7 @@ public class BlogServiceImpl implements BlogService {
         Long myUserId = Long.valueOf(claims.get(JwtClaimsConstant.ID).toString());
 
         String blogsKey = SystemConstant.REDIS_BLOGS_KEY;
-        List<Blog> blogList = redisUtil.queryListWithCachePenetration(blogsKey, null, Blog.class, null, this::getBlogsFromDB, SystemConstant.REDIS_BLOGS_EXPIRATION, TimeUnit.MINUTES);
+        List<Blog> blogList = redisUtil.queryListWithCachePenetration(blogsKey, null, Blog.class, null, this::getBlogsFromDB, SystemConstant.REDIS_BLOGS_EXPIRATION, TimeUnit.MINUTES).getData();
         List<BlogVO> blogVOList = new ArrayList<>();
 
         for (Blog b : blogList) {
@@ -229,25 +152,7 @@ public class BlogServiceImpl implements BlogService {
             }
 
             if (isLiked == 1 || isFavorite == 1) {
-                BlogVO blogVO = BlogVO.builder()
-                        .id(b.getId())
-                        .userId(b.getUserId())
-                        .username(user.getUsername())
-                        .profilePicture(user.getProfilePicture())
-                        .title(b.getTitle())
-                        .content(b.getContent())
-                        .images(b.getImages())
-                        .tags(b.getTags())
-                        .likes(b.getLikes())
-                        .favorites(b.getFavorites())
-                        .isLiked(isLikedByMe)
-                        .IsFavorite(isFavoriteByMe)
-                        .otherUserLiked(isLiked)
-                        .otherUserFavorite(isFavorite)
-                        .comments(b.getComments())
-                        .createdTime(b.getCreatedTime())
-                        .updatedTime(b.getUpdatedTime())
-                        .build();
+                BlogVO blogVO = BlogVO.builder().id(b.getId()).userId(b.getUserId()).username(user.getUsername()).profilePicture(user.getProfilePicture()).title(b.getTitle()).content(b.getContent()).images(b.getImages()).tags(b.getTags()).address(b.getAddress()).likes(b.getLikes()).favorites(b.getFavorites()).isLiked(isLikedByMe).IsFavorite(isFavoriteByMe).otherUserLiked(isLiked).otherUserFavorite(isFavorite).comments(b.getComments()).createTime(b.getCreateTime()).updateTime(b.getUpdateTime()).build();
                 blogVOList.add(blogVO);
             }
         }
@@ -270,21 +175,27 @@ public class BlogServiceImpl implements BlogService {
         }
 
         // 更新redis中的数据
+        // 如果redis中的数据没有过期，则更新
+        // 否则会执行queryListWithCachePenetration中的数据库查询操作，返回的就是新数据，flag就为true，不会执行更新操作
         String blogsKey = SystemConstant.REDIS_BLOGS_KEY;
-        List<Blog> blogList = redisUtil.queryListWithCachePenetration(blogsKey, null, Blog.class, null, this::getBlogsFromDB, SystemConstant.REDIS_BLOGS_EXPIRATION, TimeUnit.MINUTES);
-        for (int i = 0; i < blogList.size(); i++) {
-            Blog blog = blogList.get(i);
-            if (blogId.equals(blog.getId())) {
-                if (isLiked == 0) {
-                    blog.setLikes(blog.getLikes() + 1);
-                } else {
-                    blog.setLikes(blog.getLikes() - 1);
+        QueryRedisListResult<Blog> q = redisUtil.queryListWithCachePenetration(blogsKey, null, Blog.class, null, this::getBlogsFromDB, SystemConstant.REDIS_BLOGS_EXPIRATION, TimeUnit.MINUTES);
+
+        if (!q.getFlag()) {
+            List<Blog> blogList = q.getData();
+            for (int i = 0; i < blogList.size(); i++) {
+                Blog blog = blogList.get(i);
+                if (blogId.equals(blog.getId())) {
+                    if (isLiked == 0) {
+                        blog.setLikes(blog.getLikes() + 1);
+                    } else {
+                        blog.setLikes(blog.getLikes() - 1);
+                    }
+                    blogList.set(i, blog);
+                    break;
                 }
-                blogList.set(i, blog);
-                break;
             }
+            redisUtil.set(blogsKey, blogList, SystemConstant.REDIS_BLOGS_EXPIRATION, TimeUnit.MINUTES);
         }
-        redisUtil.set(blogsKey, blogList, SystemConstant.REDIS_BLOGS_EXPIRATION, TimeUnit.MINUTES);
     }
 
     @Override
@@ -304,20 +215,25 @@ public class BlogServiceImpl implements BlogService {
 
         // 更新redis中的数据
         String blogsKey = SystemConstant.REDIS_BLOGS_KEY;
-        List<Blog> blogList = redisUtil.queryListWithCachePenetration(blogsKey, null, Blog.class, null, this::getBlogsFromDB, SystemConstant.REDIS_BLOGS_EXPIRATION, TimeUnit.MINUTES);
-        for (int i = 0; i < blogList.size(); i++) {
-            Blog blog = blogList.get(i);
-            if (blogId.equals(blog.getId())) {
-                if (isFavorite == 0) {
-                    blog.setFavorites(blog.getFavorites() + 1);
-                } else {
-                    blog.setFavorites(blog.getFavorites() - 1);
+        QueryRedisListResult<Blog> q = redisUtil.queryListWithCachePenetration(blogsKey, null, Blog.class, null, this::getBlogsFromDB, SystemConstant.REDIS_BLOGS_EXPIRATION, TimeUnit.MINUTES);
+
+        if (!q.getFlag()) {
+            List<Blog> blogList = q.getData();
+            for (int i = 0; i < blogList.size(); i++) {
+                Blog blog = blogList.get(i);
+                if (blogId.equals(blog.getId())) {
+                    if (isFavorite == 0) {
+                        blog.setFavorites(blog.getFavorites() + 1);
+                    } else {
+                        blog.setFavorites(blog.getFavorites() - 1);
+                    }
+                    blogList.set(i, blog);
+                    break;
                 }
-                blogList.set(i, blog);
-                break;
             }
+            redisUtil.set(blogsKey, blogList, SystemConstant.REDIS_BLOGS_EXPIRATION, TimeUnit.MINUTES);
         }
-        redisUtil.set(blogsKey, blogList, SystemConstant.REDIS_BLOGS_EXPIRATION, TimeUnit.MINUTES);
+
     }
 
     @Override
@@ -340,21 +256,51 @@ public class BlogServiceImpl implements BlogService {
         String blogCommentsKey = SystemConstant.REDIS_BLOG_COMMENTS_KEY;
         String blogChildrenCommentsKey = SystemConstant.REDIS_BLOG_CHILDREN_COMMENTS_KEY;
 
-        List<BlogComments> blogCommentsList;
         if (blogComments.getParentId() == 0) {
-            blogCommentsList = redisUtil.queryListWithCachePenetration(blogCommentsKey, blogComments.getBlogId(), BlogComments.class, this::getParentBlogCommentsFromDB, null, SystemConstant.REDIS_BLOG_COMMENTS_EXPIRATION, TimeUnit.MINUTES);
-            if (blogCommentsList == null) {
-                blogCommentsList = new ArrayList<>();
+            QueryRedisListResult<BlogComments> q = redisUtil.queryListWithCachePenetration(blogCommentsKey, blogComments.getBlogId(), BlogComments.class, this::getParentBlogCommentsFromDB, null, SystemConstant.REDIS_BLOG_COMMENTS_EXPIRATION, TimeUnit.MINUTES);
+            if (!q.getFlag()) {
+                List<BlogComments> blogCommentsList = q.getData();
+                if (blogCommentsList == null) {
+                    blogCommentsList = new ArrayList<>();
+                }
+                blogCommentsList.add(blogComments);
+                redisUtil.set(blogCommentsKey + blogComments.getBlogId(), blogCommentsList, SystemConstant.REDIS_BLOG_COMMENTS_EXPIRATION, TimeUnit.MINUTES);
             }
-            blogCommentsList.add(blogComments);
-            redisUtil.set(blogCommentsKey + blogComments.getBlogId(), blogCommentsList, SystemConstant.REDIS_BLOG_COMMENTS_EXPIRATION, TimeUnit.MINUTES);
+
         } else {
-            blogCommentsList = redisUtil.queryListWithCachePenetration(blogChildrenCommentsKey, blogComments.getBlogId(), blogComments.getParentId(), BlogComments.class, this::getChildrenBlogCommentsFromDB, SystemConstant.REDIS_BLOG_COMMENTS_EXPIRATION, TimeUnit.MINUTES);
-            if (blogCommentsList == null) {
-                blogCommentsList = new ArrayList<>();
+            QueryRedisListResult<BlogComments> q = redisUtil.queryListWithCachePenetration(blogChildrenCommentsKey, blogComments.getBlogId(), blogComments.getParentId(), BlogComments.class, this::getChildrenBlogCommentsFromDB, SystemConstant.REDIS_BLOG_COMMENTS_EXPIRATION, TimeUnit.MINUTES);
+            if (!q.getFlag()) {
+                List<BlogComments> blogCommentsList = q.getData();
+                if (blogCommentsList == null) {
+                    blogCommentsList = new ArrayList<>();
+                }
+                blogCommentsList.add(blogComments);
+                redisUtil.set(blogChildrenCommentsKey + blogComments.getBlogId() + "_" + blogComments.getParentId(), blogCommentsList, SystemConstant.REDIS_BLOG_COMMENTS_EXPIRATION, TimeUnit.MINUTES);
             }
-            blogCommentsList.add(blogComments);
-            redisUtil.set(blogChildrenCommentsKey + blogComments.getBlogId() + "_" + blogComments.getParentId(), blogCommentsList, SystemConstant.REDIS_BLOG_COMMENTS_EXPIRATION, TimeUnit.MINUTES);
+        }
+    }
+
+    @Override
+    public void postBlog(BlogDTO blogDTO) {
+        Claims claims = ThreadLocalUtil.get();
+        Long userId = Long.valueOf(claims.get(JwtClaimsConstant.ID).toString());
+
+        Blog blog = new Blog();
+        BeanUtils.copyProperties(blogDTO, blog);
+
+        blog.setUserId(userId);
+        blog.setLikes(0);
+        blog.setFavorites(0);
+        blog.setComments(0);
+
+        blogMapper.postBlog(blog);
+
+        // 更新redis
+        String blogsKey = SystemConstant.REDIS_BLOGS_KEY;
+        QueryRedisListResult<Blog> q= redisUtil.queryListWithCachePenetration(blogsKey, null, Blog.class, null, this::getBlogsFromDB, SystemConstant.REDIS_BLOGS_EXPIRATION, TimeUnit.MINUTES);
+        if (!q.getFlag()) {
+            List<Blog> blogList = q.getData();blogList.add(blog);
+            redisUtil.set(blogsKey, blogList, SystemConstant.REDIS_BLOGS_EXPIRATION, TimeUnit.MINUTES);
         }
     }
 

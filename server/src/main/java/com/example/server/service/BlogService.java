@@ -1,6 +1,7 @@
 package com.example.server.service;
 
 import com.example.pojo.dto.BlogCommentsDTO;
+import com.example.pojo.dto.BlogDTO;
 import com.example.pojo.vo.BlogContentVO;
 import com.example.pojo.vo.BlogVO;
 
@@ -20,4 +21,6 @@ public interface BlogService {
     void favoriteBlog(Long blogId);
 
     void postBlogComment(BlogCommentsDTO blogCommentsDTO);
+
+    void postBlog(BlogDTO blogDTO);
 }

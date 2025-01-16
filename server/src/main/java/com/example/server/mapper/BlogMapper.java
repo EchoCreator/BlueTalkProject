@@ -8,7 +8,7 @@ import java.util.List;
 
 @Mapper
 public interface BlogMapper {
-    @Select("select * from blog")
+    @Select("select * from blog order by create_time desc")
     List<Blog> getBlogs();
 
     @Select("select * from blog_comments where blog_id=#{blogId} and parent_id=0")
@@ -50,4 +50,6 @@ public interface BlogMapper {
     void decreaseFavoriteNum(Long blogId);
 
     void postBlogComment(BlogComments blogComments);
+
+    void postBlog(Blog blog);
 }

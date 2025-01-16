@@ -22,6 +22,7 @@ public class BlogVO implements Serializable {
     private String content;
     private String images;
     private String tags;
+    private String address;
     private Integer likes;
     private Integer favorites;
     private Integer isLiked;
@@ -30,7 +31,7 @@ public class BlogVO implements Serializable {
     private Integer otherUserFavorite;
     private Integer comments;
     @JsonFormat(pattern = "yyyy/MM/dd HH:mm:ss")
-    private LocalDateTime createdTime;
+    private LocalDateTime createTime;
     @JsonFormat(pattern = "yyyy/MM/dd HH:mm:ss")
-    private LocalDateTime updatedTime;
+    private LocalDateTime updateTime;
 }

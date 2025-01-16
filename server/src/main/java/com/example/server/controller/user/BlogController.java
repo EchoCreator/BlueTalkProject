@@ -3,6 +3,7 @@ package com.example.server.controller.user;
 import com.example.common.result.Result;
 import com.example.common.utils.RedisUtil;
 import com.example.pojo.dto.BlogCommentsDTO;
+import com.example.pojo.dto.BlogDTO;
 import com.example.pojo.vo.BlogContentVO;
 import com.example.pojo.vo.BlogVO;
 import com.example.server.service.BlogService;
@@ -56,6 +57,12 @@ public class BlogController {
     @PostMapping("/postBlogComment")
     public Result postBlogComment(@RequestBody BlogCommentsDTO blogCommentsDTO) {
         blogService.postBlogComment(blogCommentsDTO);
+        return Result.success();
+    }
+
+    @PostMapping("/postBlog")
+    public Result postBlog(@RequestBody BlogDTO blogDTO) {
+        blogService.postBlog(blogDTO);
         return Result.success();
     }
 }

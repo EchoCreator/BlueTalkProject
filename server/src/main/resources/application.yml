@@ -30,3 +30,8 @@ app:
     token-name: ${app.jwt.token-name}
   code:
     expiration: ${app.code.expiration}
+  ali:
+    access-key-id: ${app.ali.access-key-id}
+    access-key-secret: ${app.ali.access-key-secret}
+    endpoint: ${app.ali.endpoint}
+    bucket-name: ${app.ali.bucket-name}

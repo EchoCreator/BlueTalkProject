@@ -188,7 +188,7 @@ public class UserServiceImpl implements UserService {
     }
 
     public User getUserFromCache(Long userId) {
-        User user = redisUtil.queryWithCachePenetration(SystemConstant.REDIS_USER_KEY, userId, User.class, this::getUserByIdFromDB, null, SystemConstant.REDIS_USER_EXPIRATION, TimeUnit.MINUTES);
+        User user = redisUtil.queryWithCachePenetration(SystemConstant.REDIS_USER_KEY, userId, User.class, this::getUserByIdFromDB, null, SystemConstant.REDIS_USER_EXPIRATION, TimeUnit.MINUTES).getData();
         if (user == null) {
             throw new NoDataInDBException("该用户不存在！");
         }
@@ -196,7 +196,7 @@ public class UserServiceImpl implements UserService {
     }
 
     public UserInfo getUserInfoFromCache(Long userId) {
-        UserInfo userInfo = redisUtil.queryWithCachePenetration(SystemConstant.REDIS_USER_INFO_KEY, userId, UserInfo.class, this::getUserInfoByIdFromDB, null, SystemConstant.REDIS_USER_EXPIRATION, TimeUnit.MINUTES);
+        UserInfo userInfo = redisUtil.queryWithCachePenetration(SystemConstant.REDIS_USER_INFO_KEY, userId, UserInfo.class, this::getUserInfoByIdFromDB, null, SystemConstant.REDIS_USER_EXPIRATION, TimeUnit.MINUTES).getData();
         if (userInfo == null) {
             throw new NoDataInDBException("该用户信息数据不存在！");
         }

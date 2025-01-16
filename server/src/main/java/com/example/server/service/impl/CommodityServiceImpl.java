@@ -36,7 +36,7 @@ public class CommodityServiceImpl implements CommodityService {
     @Override
     public List<CommodityTypeVO> getCommodityType() {
         String key = SystemConstant.REDIS_COMMODITY_TYPE_KEY;
-        List<CommodityType> list = redisUtil.queryListWithCachePenetration(key, null, CommodityType.class, null, this::getCommodityTypeFromDB, SystemConstant.REDIS_COMMODITY_TYPE_EXPIRATION, TimeUnit.DAYS);
+        List<CommodityType> list = redisUtil.queryListWithCachePenetration(key, null, CommodityType.class, null, this::getCommodityTypeFromDB, SystemConstant.REDIS_COMMODITY_TYPE_EXPIRATION, TimeUnit.DAYS).getData();
         if (list == null) {
             throw new NoDataInDBException("商品类别数据为空！");
         }
@@ -57,7 +57,7 @@ public class CommodityServiceImpl implements CommodityService {
     @Override
     public List<CommodityVO> getCommodity(String name, Long typeId) {
         String key = SystemConstant.REDIS_COMMODITY_LIST_KEY;
-        List<Commodity> commodityList = redisUtil.queryListWithCachePenetration(key, typeId, Commodity.class, this::getCommodityByTypeFromDB, null, SystemConstant.REDIS_COMMODITY_LIST_EXPIRATION, TimeUnit.MINUTES);
+        List<Commodity> commodityList = redisUtil.queryListWithCachePenetration(key, typeId, Commodity.class, this::getCommodityByTypeFromDB, null, SystemConstant.REDIS_COMMODITY_LIST_EXPIRATION, TimeUnit.MINUTES).getData();
         if (commodityList == null) {
             throw new NoDataInDBException("该类别还没有商品！");
         }
@@ -86,7 +86,7 @@ public class CommodityServiceImpl implements CommodityService {
         String commodity_key = SystemConstant.REDIS_COMMODITY_KEY;
 
         // 查找商品信息
-        Commodity commodity = redisUtil.queryWithCachePenetration(commodity_key, commodityId, Commodity.class, this::getCommodityByIdFromDB, null, SystemConstant.REDIS_COMMODITY_EXPIRATION, TimeUnit.MINUTES);
+        Commodity commodity = redisUtil.queryWithCachePenetration(commodity_key, commodityId, Commodity.class, this::getCommodityByIdFromDB, null, SystemConstant.REDIS_COMMODITY_EXPIRATION, TimeUnit.MINUTES).getData();
         if (commodity == null) {
             throw new NoDataInDBException("暂无该商品信息！");
         }
@@ -162,7 +162,7 @@ public class CommodityServiceImpl implements CommodityService {
     @Override
     public List<CommodityVO> getUsersCommodity(Long userId) {
         String key=SystemConstant.REDIS_USER_COMMODITY_KEY;
-        List<Commodity> commodityList =redisUtil.queryListWithCachePenetration(key,userId,Commodity.class,this::getCommodityByUserIdFromDB, null, SystemConstant.REDIS_USER_COMMODITY_EXPIRATION, TimeUnit.MINUTES);
+        List<Commodity> commodityList =redisUtil.queryListWithCachePenetration(key,userId,Commodity.class,this::getCommodityByUserIdFromDB, null, SystemConstant.REDIS_USER_COMMODITY_EXPIRATION, TimeUnit.MINUTES).getData();
         if (commodityList == null) {
             throw new NoDataInDBException("该用户还没有任何店铺商品！");
         }
@@ -205,7 +205,7 @@ public class CommodityServiceImpl implements CommodityService {
     }
 
     public List<CommodityComments> getCommodityCommentsFromCache(Long commodityId) {
-        List<CommodityComments> commodityComments = redisUtil.queryListWithCachePenetration(SystemConstant.REDIS_COMMODITY_COMMENTS_KEY, commodityId, CommodityComments.class, this::getCommodityCommentsByIdFromDB, null, SystemConstant.REDIS_COMMODITY_COMMENTS_EXPIRATION, TimeUnit.MINUTES);
+        List<CommodityComments> commodityComments = redisUtil.queryListWithCachePenetration(SystemConstant.REDIS_COMMODITY_COMMENTS_KEY, commodityId, CommodityComments.class, this::getCommodityCommentsByIdFromDB, null, SystemConstant.REDIS_COMMODITY_COMMENTS_EXPIRATION, TimeUnit.MINUTES).getData();
         if (commodityComments == null) {
             throw new NoDataInDBException("该商品还没有评论！");
         }

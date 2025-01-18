@@ -5,5 +5,10 @@ app:
     token-name: Authorization
   code:
     expiration: 120000 # 两分钟1000*60*2
+  ali:
+    endpoint: https://oss-cn-shanghai.aliyuncs.com
+    access-key-id: LTAI5t97NfY7urbiCuGv5bNh
+    access-key-secret: mGraXAxBbdIKNIcKQXsyXc0dY19BCG
+    bucketName: news-web-project
 
 

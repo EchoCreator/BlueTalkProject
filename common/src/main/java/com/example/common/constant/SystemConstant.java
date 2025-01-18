@@ -43,4 +43,11 @@ public class SystemConstant {
     public static final String REDIS_BLOG_COMMENTS_KEY = "blog_comments_"; // 存储单个帖子的一级评论列表
     public static final String REDIS_BLOG_CHILDREN_COMMENTS_KEY = "blog_children_comments_"; // 存储单个帖子的一级评论的回复列表
     public static final Long REDIS_BLOG_COMMENTS_EXPIRATION = 5L; // 5分钟
+
+    public static final String REDIS_FOLLOWEE_KEY = "followee_"; // 存储用户关注的用户
+    public static final Long REDIS_FOLLOWEE_EXPIRATION = 5L;
+
+    public static final String REDIS_FANS_KEY = "fans_"; // 存储用户粉丝
+    public static final Long REDIS_FANS_EXPIRATION = 5L;
+
 }

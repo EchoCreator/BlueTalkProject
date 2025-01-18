@@ -6,8 +6,8 @@ import com.example.common.constant.SystemConstant;
 import com.example.common.constant.UserVoucherConstant;
 import com.example.common.exception.EventEndedException;
 import com.example.common.exception.EventYet2StartException;
-import com.example.common.exception.SeckillVoucherStockEmpty;
-import com.example.common.exception.UserVoucherExist;
+import com.example.common.exception.SeckillVoucherStockEmptyException;
+import com.example.common.exception.UserVoucherExistException;
 import com.example.common.utils.RedisUtil;
 import com.example.common.utils.ThreadLocalUtil;
 import com.example.common.utils.UniqueIDGenerator;
@@ -22,7 +22,6 @@ import jakarta.annotation.PostConstruct;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
-import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.connection.stream.*;
@@ -246,10 +245,10 @@ public class VoucherServiceImpl implements VoucherService {
         int r = result.intValue();
         // 返回结果为1说明秒杀优惠券库存不足，如果为2说明该用户已有该优惠券
         if (r == 1) {
-            throw new SeckillVoucherStockEmpty("该秒杀券已被抢光");
+            throw new SeckillVoucherStockEmptyException("该秒杀券已被抢光");
         }
         if (r == 2) {
-            throw new UserVoucherExist("您已有该优惠券，不可重复领取！");
+            throw new UserVoucherExistException("您已有该优惠券，不可重复领取！");
         }
 
         // 为0说明该用户可以正常领取该优惠券，并且已将userVoucher信息发送到了消息队列（这里为了性能淘汰掉了阻塞队列）
@@ -275,18 +274,18 @@ public class VoucherServiceImpl implements VoucherService {
         // 检查该用户是否已有该优惠券
         UserVoucher existedUserVoucher = voucherMapper.getUserVoucher(voucherId, userId);
         if (existedUserVoucher != null) {
-            throw new UserVoucherExist("您已有该优惠券，不可重复领取！");
+            throw new UserVoucherExistException("您已有该优惠券，不可重复领取！");
         }
 
         // 如果是秒杀优惠券，还需要让其库存-1
         if (userVoucher.getType() == 1) {
             SeckillVoucher seckillVoucher = voucherMapper.getSeckillVoucherById(voucherId);
             if (seckillVoucher.getCurrentStock() < 1) {
-                throw new SeckillVoucherStockEmpty("该优惠券已被抢光");
+                throw new SeckillVoucherStockEmptyException("该优惠券已被抢光");
             }
             Boolean success = voucherMapper.setSeckillVoucherCurrentStock(voucherId);
             if (!success) {
-                throw new SeckillVoucherStockEmpty("该优惠券已被抢光");
+                throw new SeckillVoucherStockEmptyException("该优惠券已被抢光");
             }
         }
 

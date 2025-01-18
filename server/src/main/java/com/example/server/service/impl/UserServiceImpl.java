@@ -52,6 +52,8 @@ public class UserServiceImpl implements UserService {
     private JwtProperties jwtProperties;
     @Autowired
     private RedisUtil redisUtil;
+    @Autowired
+    private FollowServiceImpl followServiceImpl;
 
     @Override
     public void getCode(String phoneNumber) {
@@ -88,7 +90,7 @@ public class UserServiceImpl implements UserService {
             throw new IncorrectCodeException("验证码错误！");
         }
 
-        // 查找用户是否已注册
+        // 查找用户是否已注册，如果没有注册，则自动进行注册
         User user = userMapper.findUserByPhoneNumber(userLoginDTO.getPhoneNumber());
         if (user == null) {
             user = new User();
@@ -105,6 +107,9 @@ public class UserServiceImpl implements UserService {
             userInfo.setLevel(0);
             userInfoMapper.addUserInfo(userInfo);
         }
+
+        // 获取用户的关注和粉丝信息
+        followServiceImpl.getMyFolloweeFans(user.getId());
 
         // 生成token并保存在redis中
         Map<String, Object> claims = new HashMap<>();
@@ -132,7 +137,7 @@ public class UserServiceImpl implements UserService {
         UserInfo userInfo = this.getUserInfoFromCache(id);
 
         // 计算年龄
-        Integer age=this.calculateAge(userInfo);
+        Integer age = this.calculateAge(userInfo);
 
         UserVO userVO = UserVO.builder()
                 .id(user.getId())
@@ -160,7 +165,7 @@ public class UserServiceImpl implements UserService {
         UserInfo userInfo = this.getUserInfoFromCache(id);
 
         // 计算年龄
-        Integer age=this.calculateAge(userInfo);
+        Integer age = this.calculateAge(userInfo);
 
         OtherUserVO otherUserVO = OtherUserVO.builder()
                 .id(user.getId())

@@ -1,15 +1,21 @@
 package com.example.server;
 
+import com.example.common.constant.JwtClaimsConstant;
 import com.example.common.constant.SystemConstant;
 import com.example.common.utils.RedisUtil;
+import com.example.common.utils.ThreadLocalUtil;
+import com.example.pojo.vo.FollowUserVO;
 import com.example.pojo.vo.VoucherInfoVO;
 import com.example.server.mapper.VoucherMapper;
+import com.example.server.service.impl.FollowServiceImpl;
 import com.example.server.service.impl.VoucherServiceImpl;
+import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -18,9 +24,11 @@ public class VoucherInfoRedisTest {
     @Autowired
     private RedisUtil redisUtil;
     @Autowired
-    private VoucherServiceImpl voucherService;
+    private VoucherServiceImpl voucherServiceImpl;
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
+    @Autowired
+    private FollowServiceImpl followServiceImpl;
 
     @Test
     public void test() {
@@ -28,13 +36,23 @@ public class VoucherInfoRedisTest {
         // XGROUP CREATE stream_userVouchers group1 0 MKSTREAM
         // 命令生成名为stream_userVouchers的消息队列和名为group1的组
 
-        List<VoucherInfoVO> list = voucherService.getVoucherInfoFromDB();
+        List<VoucherInfoVO> list = voucherServiceImpl.getVoucherInfoFromDB();
         redisUtil.setWithLogicalExpire(SystemConstant.REDIS_VOUCHER_INFO_KEY, list, SystemConstant.REDIS_VOUCHER_INFO_EXPIRATION, TimeUnit.MINUTES);
 
         for (VoucherInfoVO v : list) {
             if (v.getType() == 1) {
                 stringRedisTemplate.opsForValue().set(SystemConstant.REDIS_LUA_VOUCHER_STOCK_KEY + v.getId(), v.getStock().toString());
             }
+        }
+
+
+        // 推送笔记id给所有粉丝（还包含时间戳作为标识）
+        Long userId = 1L;
+        String feedStreamKey = SystemConstant.REDIS_FEED_STREAM_KEY + userId;
+        Long id = 28L;
+        while (id <= 35) {
+            stringRedisTemplate.opsForZSet().add(feedStreamKey, id.toString(), System.currentTimeMillis());
+            id++;
         }
     }
 }

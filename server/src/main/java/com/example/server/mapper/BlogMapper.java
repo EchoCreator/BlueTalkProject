@@ -51,5 +51,8 @@ public interface BlogMapper {
 
     void postBlogComment(BlogComments blogComments);
 
+    @Update("update blog set comments=comments+1 where id=#{blogId}")
+    void updateBlogCommentNum(Long blogId);
+
     void postBlog(Blog blog);
 }

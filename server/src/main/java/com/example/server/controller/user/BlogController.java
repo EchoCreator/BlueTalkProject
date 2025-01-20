@@ -1,5 +1,6 @@
 package com.example.server.controller.user;
 
+import com.example.common.result.PaginationResult;
 import com.example.common.result.Result;
 import com.example.common.utils.RedisUtil;
 import com.example.pojo.dto.BlogCommentsDTO;
@@ -64,5 +65,11 @@ public class BlogController {
     public Result postBlog(@RequestBody BlogDTO blogDTO) {
         blogService.postBlog(blogDTO);
         return Result.success();
+    }
+
+    @GetMapping("/getFolloweeBlogs")
+    public Result<PaginationResult<BlogVO>> getFolloweeBlogs(@RequestParam("minTime") Long max, @RequestParam(name = "offset", defaultValue = "0") Integer offset) {
+        PaginationResult<BlogVO> list = blogService.getFolloweeBlogs(max,offset);
+        return Result.success(list);
     }
 }

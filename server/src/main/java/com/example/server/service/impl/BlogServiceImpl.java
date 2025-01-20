@@ -3,6 +3,7 @@ package com.example.server.service.impl;
 import com.example.common.constant.BlogCommentsConstant;
 import com.example.common.constant.JwtClaimsConstant;
 import com.example.common.constant.SystemConstant;
+import com.example.common.result.PaginationResult;
 import com.example.common.result.QueryRedisListResult;
 import com.example.common.utils.RedisUtil;
 import com.example.common.utils.ThreadLocalUtil;
@@ -16,12 +17,16 @@ import com.example.server.service.BlogService;
 import io.jsonwebtoken.Claims;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -32,6 +37,10 @@ public class BlogServiceImpl implements BlogService {
     private RedisUtil redisUtil;
     @Autowired
     private UserServiceImpl userServiceImpl;
+    @Autowired
+    private FollowServiceImpl followServiceImpl;
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
 
     @Override
     public List<BlogVO> getBlogs() {
@@ -233,7 +242,6 @@ public class BlogServiceImpl implements BlogService {
             }
             redisUtil.set(blogsKey, blogList, SystemConstant.REDIS_BLOGS_EXPIRATION, TimeUnit.MINUTES);
         }
-
     }
 
     @Override
@@ -251,15 +259,34 @@ public class BlogServiceImpl implements BlogService {
         blogComments.setUpdateTime(LocalDateTime.now());
 
         blogMapper.postBlogComment(blogComments);
+        blogMapper.updateBlogCommentNum(blogComments.getBlogId());
 
         // 更新redis
         String blogCommentsKey = SystemConstant.REDIS_BLOG_COMMENTS_KEY;
         String blogChildrenCommentsKey = SystemConstant.REDIS_BLOG_CHILDREN_COMMENTS_KEY;
 
+        // 更新redis中的笔记评论数量
+        String blogsKey = SystemConstant.REDIS_BLOGS_KEY;
+        QueryRedisListResult<Blog> q1 = redisUtil.queryListWithCachePenetration(blogsKey, null, Blog.class, null, this::getBlogsFromDB, SystemConstant.REDIS_BLOGS_EXPIRATION, TimeUnit.MINUTES);
+        if (!q1.getFlag()) {
+            List<Blog> blogList = q1.getData();
+            for (int i = 0; i < blogList.size(); i++) {
+                if (blogList.get(i).getId().equals(blogComments.getBlogId())) {
+                    Blog blog = blogList.get(i);
+                    Integer comments = blogList.get(i).getComments() + 1;
+                    blog.setComments(comments);
+                    blogList.set(i, blog);
+                    break;
+                }
+            }
+            redisUtil.set(blogsKey, blogList, SystemConstant.REDIS_BLOGS_EXPIRATION, TimeUnit.MINUTES);
+        }
+
+        // 更新redis中的笔记评论
         if (blogComments.getParentId() == 0) {
-            QueryRedisListResult<BlogComments> q = redisUtil.queryListWithCachePenetration(blogCommentsKey, blogComments.getBlogId(), BlogComments.class, this::getParentBlogCommentsFromDB, null, SystemConstant.REDIS_BLOG_COMMENTS_EXPIRATION, TimeUnit.MINUTES);
-            if (!q.getFlag()) {
-                List<BlogComments> blogCommentsList = q.getData();
+            QueryRedisListResult<BlogComments> q2 = redisUtil.queryListWithCachePenetration(blogCommentsKey, blogComments.getBlogId(), BlogComments.class, this::getParentBlogCommentsFromDB, null, SystemConstant.REDIS_BLOG_COMMENTS_EXPIRATION, TimeUnit.MINUTES);
+            if (!q2.getFlag()) {
+                List<BlogComments> blogCommentsList = q2.getData();
                 if (blogCommentsList == null) {
                     blogCommentsList = new ArrayList<>();
                 }
@@ -268,9 +295,9 @@ public class BlogServiceImpl implements BlogService {
             }
 
         } else {
-            QueryRedisListResult<BlogComments> q = redisUtil.queryListWithCachePenetration(blogChildrenCommentsKey, blogComments.getBlogId(), blogComments.getParentId(), BlogComments.class, this::getChildrenBlogCommentsFromDB, SystemConstant.REDIS_BLOG_COMMENTS_EXPIRATION, TimeUnit.MINUTES);
-            if (!q.getFlag()) {
-                List<BlogComments> blogCommentsList = q.getData();
+            QueryRedisListResult<BlogComments> q2 = redisUtil.queryListWithCachePenetration(blogChildrenCommentsKey, blogComments.getBlogId(), blogComments.getParentId(), BlogComments.class, this::getChildrenBlogCommentsFromDB, SystemConstant.REDIS_BLOG_COMMENTS_EXPIRATION, TimeUnit.MINUTES);
+            if (!q2.getFlag()) {
+                List<BlogComments> blogCommentsList = q2.getData();
                 if (blogCommentsList == null) {
                     blogCommentsList = new ArrayList<>();
                 }
@@ -292,16 +319,67 @@ public class BlogServiceImpl implements BlogService {
         blog.setLikes(0);
         blog.setFavorites(0);
         blog.setComments(0);
+        blog.setCreateTime(LocalDateTime.now());
+        blog.setUpdateTime(LocalDateTime.now());
 
         blogMapper.postBlog(blog);
 
         // 更新redis
         String blogsKey = SystemConstant.REDIS_BLOGS_KEY;
-        QueryRedisListResult<Blog> q= redisUtil.queryListWithCachePenetration(blogsKey, null, Blog.class, null, this::getBlogsFromDB, SystemConstant.REDIS_BLOGS_EXPIRATION, TimeUnit.MINUTES);
+        QueryRedisListResult<Blog> q = redisUtil.queryListWithCachePenetration(blogsKey, null, Blog.class, null, this::getBlogsFromDB, SystemConstant.REDIS_BLOGS_EXPIRATION, TimeUnit.MINUTES);
         if (!q.getFlag()) {
-            List<Blog> blogList = q.getData();blogList.add(blog);
+            List<Blog> blogList = q.getData();
+            blogList.add(blog);
             redisUtil.set(blogsKey, blogList, SystemConstant.REDIS_BLOGS_EXPIRATION, TimeUnit.MINUTES);
         }
+
+        // 推送笔记id给所有粉丝（还包含时间戳作为标识）
+        List<FollowUserVO> list = followServiceImpl.getFans(userId);
+        for (FollowUserVO followUserVO : list) {
+            String feedStreamKey = SystemConstant.REDIS_FEED_STREAM_KEY + followUserVO.getUserId();
+            stringRedisTemplate.opsForZSet().add(feedStreamKey, blog.getId().toString(), System.currentTimeMillis());
+        }
+    }
+
+    @Override
+    // 分页查询
+    public PaginationResult<BlogVO> getFolloweeBlogs(Long max, Integer offset) {
+        Claims claims = ThreadLocalUtil.get();
+        Long userId = Long.valueOf(claims.get(JwtClaimsConstant.ID).toString());
+
+        String key = SystemConstant.REDIS_FEED_STREAM_KEY + userId;
+
+        // 解析数据：包含blogId和时间戳，并得到minTime（最后一个blogId的时间戳）和offset（具有相同mintTime的blogId的个数）
+        Set<ZSetOperations.TypedTuple<String>> typedTuples = stringRedisTemplate.opsForZSet().reverseRangeByScoreWithScores(key, 0, max, offset, 6);
+        if (typedTuples == null || typedTuples.isEmpty()) {
+            return null;
+        }
+
+        Long minTime = 0L;
+        Integer newOffset = 1;
+        List<Long> blogIds = new ArrayList<>(typedTuples.size());
+        for (ZSetOperations.TypedTuple<String> typedTuple : typedTuples) {
+            // 获取blogId并添加到列表中
+            blogIds.add(Long.valueOf(Objects.requireNonNull(typedTuple.getValue())));
+            // 获取分数（时间戳）
+            long score = typedTuple.getScore().longValue();
+
+            if (score == minTime) {
+                newOffset++;
+            } else {
+                minTime = score;
+                newOffset = 1;
+            }
+        }
+
+        List<BlogVO> blogVOList = getBlogs();
+        List<BlogVO> followeeBlogVOList = new ArrayList<>();
+        for (BlogVO b : blogVOList) {
+            if (blogIds.contains(b.getId())) {
+                followeeBlogVOList.add(b);
+            }
+        }
+        return new PaginationResult<>(followeeBlogVOList, minTime, newOffset);
     }
 
     public List<Blog> getBlogsFromDB() {

@@ -50,4 +50,6 @@ public class SystemConstant {
     public static final String REDIS_FANS_KEY = "fans_"; // 存储用户粉丝
     public static final Long REDIS_FANS_EXPIRATION = 5L;
 
+    public static final String REDIS_FEED_STREAM_KEY = "feed_stream_"; // 存储feed流里的数据（如给粉丝推送最新发的笔记）
+
 }

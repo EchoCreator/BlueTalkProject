@@ -1,5 +1,6 @@
 package com.example.server.service;
 
+import com.example.common.result.PaginationResult;
 import com.example.pojo.dto.BlogCommentsDTO;
 import com.example.pojo.dto.BlogDTO;
 import com.example.pojo.vo.BlogContentVO;
@@ -23,4 +24,6 @@ public interface BlogService {
     void postBlogComment(BlogCommentsDTO blogCommentsDTO);
 
     void postBlog(BlogDTO blogDTO);
+
+    PaginationResult<BlogVO> getFolloweeBlogs(Long max, Integer offset);
 }

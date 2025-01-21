@@ -18,6 +18,8 @@ public class Blog {
     private String images;
     private String tags;
     private String address;
+    private Double locationX;
+    private Double locationY;
     private Integer likes;
     private Integer favorites;
     private Integer comments;

@@ -26,4 +26,6 @@ public interface BlogService {
     void postBlog(BlogDTO blogDTO);
 
     PaginationResult<BlogVO> getFolloweeBlogs(Long max, Integer offset);
+
+    List<BlogVO> getNearbyBlogs(Integer page);
 }

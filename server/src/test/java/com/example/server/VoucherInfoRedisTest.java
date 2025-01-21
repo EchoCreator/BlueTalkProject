@@ -7,6 +7,7 @@ import com.example.common.utils.ThreadLocalUtil;
 import com.example.pojo.vo.FollowUserVO;
 import com.example.pojo.vo.VoucherInfoVO;
 import com.example.server.mapper.VoucherMapper;
+import com.example.server.service.impl.BlogServiceImpl;
 import com.example.server.service.impl.FollowServiceImpl;
 import com.example.server.service.impl.VoucherServiceImpl;
 import io.jsonwebtoken.Claims;
@@ -26,6 +27,8 @@ public class VoucherInfoRedisTest {
     @Autowired
     private VoucherServiceImpl voucherServiceImpl;
     @Autowired
+    private BlogServiceImpl blogServiceImpl;
+    @Autowired
     private StringRedisTemplate stringRedisTemplate;
     @Autowired
     private FollowServiceImpl followServiceImpl;
@@ -39,6 +42,7 @@ public class VoucherInfoRedisTest {
         List<VoucherInfoVO> list = voucherServiceImpl.getVoucherInfoFromDB();
         redisUtil.setWithLogicalExpire(SystemConstant.REDIS_VOUCHER_INFO_KEY, list, SystemConstant.REDIS_VOUCHER_INFO_EXPIRATION, TimeUnit.MINUTES);
 
+        // 把优惠券信息提前写入redis
         for (VoucherInfoVO v : list) {
             if (v.getType() == 1) {
                 stringRedisTemplate.opsForValue().set(SystemConstant.REDIS_LUA_VOUCHER_STOCK_KEY + v.getId(), v.getStock().toString());
@@ -46,7 +50,7 @@ public class VoucherInfoRedisTest {
         }
 
 
-        // 推送笔记id给所有粉丝（还包含时间戳作为标识）
+        // 把‘我’关注的用户的笔记推送给‘我’（还包含时间戳作为标识）
         Long userId = 1L;
         String feedStreamKey = SystemConstant.REDIS_FEED_STREAM_KEY + userId;
         Long id = 28L;
@@ -54,5 +58,8 @@ public class VoucherInfoRedisTest {
             stringRedisTemplate.opsForZSet().add(feedStreamKey, id.toString(), System.currentTimeMillis());
             id++;
         }
+
+        // 把笔记的经纬度信息保存在redis中
+        blogServiceImpl.loadBlogsGeo();
     }
 }

@@ -52,4 +52,5 @@ public class SystemConstant {
 
     public static final String REDIS_FEED_STREAM_KEY = "feed_stream_"; // 存储feed流里的数据（如给粉丝推送最新发的笔记）
 
+    public static final String REDIS_GEO_BLOGS_KEY = "geo_blogs";
 }

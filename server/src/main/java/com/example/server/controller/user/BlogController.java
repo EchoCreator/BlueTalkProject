@@ -72,4 +72,10 @@ public class BlogController {
         PaginationResult<BlogVO> list = blogService.getFolloweeBlogs(max,offset);
         return Result.success(list);
     }
+
+    @GetMapping("/getNearbyBlogs")
+    public Result<List<BlogVO>> getNearbyBlogs(Integer page) {
+        List<BlogVO> list=blogService.getNearbyBlogs(page);
+        return Result.success(list);
+    }
 }

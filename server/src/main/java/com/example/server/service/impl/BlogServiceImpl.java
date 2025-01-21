@@ -2,7 +2,9 @@ package com.example.server.service.impl;
 
 import com.example.common.constant.BlogCommentsConstant;
 import com.example.common.constant.JwtClaimsConstant;
+import com.example.common.constant.PaginationConstant;
 import com.example.common.constant.SystemConstant;
+import com.example.common.exception.NoDataInDBException;
 import com.example.common.result.PaginationResult;
 import com.example.common.result.QueryRedisListResult;
 import com.example.common.utils.RedisUtil;
@@ -17,8 +19,14 @@ import com.example.server.service.BlogService;
 import io.jsonwebtoken.Claims;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.geo.Distance;
+import org.springframework.data.geo.GeoResult;
+import org.springframework.data.geo.GeoResults;
+import org.springframework.data.geo.Point;
+import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
+import org.springframework.data.redis.domain.geo.GeoReference;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -342,7 +350,7 @@ public class BlogServiceImpl implements BlogService {
     }
 
     @Override
-    // 分页查询
+    // 分页查询所关注用户的最新笔记动态
     public PaginationResult<BlogVO> getFolloweeBlogs(Long max, Integer offset) {
         Claims claims = ThreadLocalUtil.get();
         Long userId = Long.valueOf(claims.get(JwtClaimsConstant.ID).toString());
@@ -350,7 +358,7 @@ public class BlogServiceImpl implements BlogService {
         String key = SystemConstant.REDIS_FEED_STREAM_KEY + userId;
 
         // 解析数据：包含blogId和时间戳，并得到minTime（最后一个blogId的时间戳）和offset（具有相同mintTime的blogId的个数）
-        Set<ZSetOperations.TypedTuple<String>> typedTuples = stringRedisTemplate.opsForZSet().reverseRangeByScoreWithScores(key, 0, max, offset, 6);
+        Set<ZSetOperations.TypedTuple<String>> typedTuples = stringRedisTemplate.opsForZSet().reverseRangeByScoreWithScores(key, 0, max, offset, PaginationConstant.DEFAULT_PAGE_SIZE);
         if (typedTuples == null || typedTuples.isEmpty()) {
             return null;
         }
@@ -380,6 +388,54 @@ public class BlogServiceImpl implements BlogService {
             }
         }
         return new PaginationResult<>(followeeBlogVOList, minTime, newOffset);
+    }
+
+    @Override
+    public List<BlogVO> getNearbyBlogs(Integer page) {
+        Integer fromIndex = (page - 1) * PaginationConstant.DEFAULT_PAGE_SIZE;
+        Integer count = page * PaginationConstant.DEFAULT_PAGE_SIZE;
+
+        Double myLocationX = 121.435312;
+        Double myLocationY = 31.197414;
+        // GeoReference.fromCoordinate(myLocationX,myLocationY)表示以‘我’的经纬度坐标为圆心
+        // new Distance(10000)表示寻找定位‘我’附近在10km以内的笔记
+        /*RedisGeoCommands.GeoSearchCommandArgs.newGeoSearchArgs().includeDistance().limit(page * 4)
+        表示返回结果带上每一篇笔记的定位离‘我’的距离，同时查询数量限定在第一篇到第count篇
+        注：limit的参数是查询的数量*/
+        GeoResults<RedisGeoCommands.GeoLocation<String>> searchResult = stringRedisTemplate.opsForGeo().search(
+                SystemConstant.REDIS_GEO_BLOGS_KEY,
+                GeoReference.fromCoordinate(myLocationX, myLocationY),
+                new Distance(10000),
+                RedisGeoCommands.GeoSearchCommandArgs.newGeoSearchArgs().includeDistance().limit(count)
+        );
+
+        if (searchResult == null) {
+            throw new NoDataInDBException("暂无数据");
+        }
+        List<GeoResult<RedisGeoCommands.GeoLocation<String>>> content = searchResult.getContent();
+
+        List<Long> ids = new ArrayList<>(content.size());
+        // stream().skip(index)是从index开始截取的
+        content.stream().skip(fromIndex).forEach(result -> {
+            Long id = Long.valueOf(result.getContent().getName());
+            ids.add(id);
+        });
+
+        List<BlogVO> blogList = getBlogs();
+        List<BlogVO> nearbyBlogVOList = new ArrayList<>();
+        for (BlogVO b : blogList) {
+            if (ids.contains(b.getId())) {
+                nearbyBlogVOList.add(b);
+            }
+        }
+        return nearbyBlogVOList;
+    }
+
+    public void loadBlogsGeo() {
+        List<Blog> list = getBlogsFromDB();
+        for (Blog blog : list) {
+            stringRedisTemplate.opsForGeo().add(SystemConstant.REDIS_GEO_BLOGS_KEY, new Point(blog.getLocationX(), blog.getLocationY()), blog.getId().toString());
+        }
     }
 
     public List<Blog> getBlogsFromDB() {

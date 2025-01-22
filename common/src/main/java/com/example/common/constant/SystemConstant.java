@@ -52,5 +52,12 @@ public class SystemConstant {
 
     public static final String REDIS_FEED_STREAM_KEY = "feed_stream_"; // 存储feed流里的数据（如给粉丝推送最新发的笔记）
 
-    public static final String REDIS_GEO_BLOGS_KEY = "geo_blogs";
+    public static final String REDIS_GEO_BLOGS_KEY = "geo_blogs"; // 存储附近的笔记id
+
+    public static final String REDIS_CHAT_INFO_KEY = "chat_info_"; // 存储聊天列表信息
+    public static final Long REDIS_CHAT_INFO_EXPIRATION = 5L;
+
+    public static final String REDIS_SINGLE_CHAT_CONTENT_KEY = "single_chat_content_"; // 存储单聊内容
+    public static final String REDIS_GROUP_CHAT_CONTENT_KEY = "group_chat_content_"; // 存储群聊内容
+    public static final Long REDIS_CHAT_CONTENT_EXPIRATION = 5L;
 }

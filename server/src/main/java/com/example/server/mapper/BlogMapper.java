@@ -11,6 +11,9 @@ public interface BlogMapper {
     @Select("select * from blog order by create_time desc")
     List<Blog> getBlogs();
 
+    @Select("select * from blog where id=#{id}")
+    Blog getBlogById(Long id);
+
     @Select("select * from blog_comments where blog_id=#{blogId} and parent_id=0")
     List<BlogComments> getBlogParentComments(Long blogId);
 

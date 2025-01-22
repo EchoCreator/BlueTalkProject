@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.example.server.mapper.ChatMapper">
+    <select id="getChatList" resultType="com.example.pojo.entity.ChatInfo">
+        -- 利用窗口函数查询
+        SELECT *
+        FROM (
+                 -- 查询 relationship_id 对应的最新记录
+                 SELECT *, ROW_NUMBER() OVER (PARTITION BY relationship_id ORDER BY create_time DESC) AS rn
+                 FROM chat
+                 WHERE
+                     relationship_id IN (
+                         SELECT id
+                         FROM single_chat_ralationship
+                         WHERE user_id = #{userId} OR another_user_id = #{userId}
+                     )
+
+                 UNION ALL
+
+                 -- 查询 group_id 对应的最新记录
+                 SELECT *, ROW_NUMBER() OVER (PARTITION BY group_id ORDER BY create_time DESC) AS rn
+                 FROM chat
+                 WHERE
+                     group_id IN (
+                         SELECT group_id
+                         FROM group_user
+                         WHERE user_id = #{userId}
+                     )
+             ) subquery
+        WHERE rn = 1 order by create_time desc;
+    </select>
+</mapper>

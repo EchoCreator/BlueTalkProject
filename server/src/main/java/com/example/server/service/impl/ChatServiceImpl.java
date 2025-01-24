@@ -131,7 +131,7 @@ public class ChatServiceImpl implements ChatService {
             redisUtil.set(chatInfoKey + userId, list, chatInfoExpiration, TimeUnit.MINUTES);
         }
 
-        // 修改对方的redis
+        // 修改聊天对方的redis
         QueryRedisListResult<ChatInfoVO> q2 = redisUtil.queryListWithCachePenetration(chatInfoKey, chatDTO.getToUserId(), ChatInfoVO.class, this::getChatListFromDB, null, chatInfoExpiration, TimeUnit.MINUTES);
         if (!q2.getFlag()) {
             ChatInfoVO c = conformityChatInfo(chatInfo, chatDTO.getToUserId());

@@ -1,5 +1,8 @@
 package com.example.server.websocket;
 
+import com.example.common.constant.JwtClaimsConstant;
+import com.example.common.utils.ThreadLocalUtil;
+import io.jsonwebtoken.Claims;
 import jakarta.websocket.OnClose;
 import jakarta.websocket.OnMessage;
 import jakarta.websocket.OnOpen;
@@ -18,7 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Component
 @ServerEndpoint("/ws/chat/{sid}")
-public class WebSocketServer {
+public class WebSocketChatServer {
 
     // 存放会话对象，记录当前在线连接数
     private static Map<String, Session> sessionMap = new ConcurrentHashMap<>();
@@ -29,7 +32,7 @@ public class WebSocketServer {
     @OnOpen
     public void onOpen(Session session, @PathParam("sid") String sid) {
         sessionMap.put(sid, session);
-        System.out.println("客户端：" + sid + "建立连接；当前在线人数为：" + sessionMap.size());
+        System.out.println("进入用户/群聊：" + sid + "的聊天频道");
     }
 
     /**
@@ -39,7 +42,7 @@ public class WebSocketServer {
      */
     @OnMessage
     public void onMessage(String message, @PathParam("sid") String sid) {
-        System.out.println("收到来自客户端：" + sid + "的信息:" + message);
+        System.out.println("收到来自用户/群聊：" + sid + "的信息:" + message);
     }
 
     /**
@@ -49,7 +52,7 @@ public class WebSocketServer {
      */
     @OnClose
     public void onClose(@PathParam("sid") String sid) {
-        System.out.println("连接断开:" + sid);
+        System.out.println("断开同用户/群聊:" + sid + "的聊天频道");
         sessionMap.remove(sid);
     }
 
@@ -58,11 +61,13 @@ public class WebSocketServer {
      * */
     public void sentMessage(String message, String key) {
         Session toSession = sessionMap.get(key);
-        System.out.println("给客户端：" + toSession.getId() + "发送消息：" + message);
-        try {
-            toSession.getBasicRemote().sendText(message);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+        if (toSession != null) {
+            System.out.println("给用户/群聊：" + toSession.getId() + "发送消息：" + message);
+            try {
+                toSession.getBasicRemote().sendText(message);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 

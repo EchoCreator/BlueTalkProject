@@ -16,6 +16,9 @@ public interface ChatMapper {
     @Select("select * from `group` where id=#{groupId}")
     Group getGroupById(Long groupId);
 
+    @Select("select user_id from group_user where group_id=#{groupId}")
+    List<Long> getGroupMembers(Long groupId);
+
     @Select("select * from chat where (from_user_id=#{userId} and to_user_id=#{anotherUserId}) or" +
             " (from_user_id=#{anotherUserId} and to_user_id=#{userId})")
     List<ChatContent> getSingleChatContentList(Long userId, Long anotherUserId);

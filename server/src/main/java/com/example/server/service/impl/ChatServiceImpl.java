@@ -16,9 +16,8 @@ import com.example.pojo.vo.*;
 import com.example.server.mapper.BlogMapper;
 import com.example.server.mapper.ChatMapper;
 import com.example.server.service.ChatService;
-import com.example.server.websocket.WebSocketServer;
+import com.example.server.websocket.WebSocketChatServer;
 import io.jsonwebtoken.Claims;
-import jakarta.websocket.Session;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -41,7 +40,7 @@ public class ChatServiceImpl implements ChatService {
     @Autowired
     private BlogMapper blogMapper;
     @Autowired
-    private WebSocketServer webSocketServer;
+    private WebSocketChatServer webSocketChatServer;
 
     @Override
     public List<ChatInfoVO> getChatList() {
@@ -110,15 +109,19 @@ public class ChatServiceImpl implements ChatService {
         chatContent.setFromUserId(userId);
         chatContent.setCreateTime(LocalDateTime.now());
 
+        chatInfo.setFromUserId(userId);
+        chatInfo.setCreateTime(LocalDateTime.now());
+
         chatMapper.sendMessage(chatContent);
 
         // 整合chatInfo并修改redis
+        // 修改‘我’的redis
         String chatInfoKey = SystemConstant.REDIS_CHAT_INFO_KEY;
         Long chatInfoExpiration = SystemConstant.REDIS_CHAT_INFO_EXPIRATION;
-        QueryRedisListResult<ChatInfoVO> q = redisUtil.queryListWithCachePenetration(chatInfoKey, userId, ChatInfoVO.class, this::getChatListFromDB, null, chatInfoExpiration, TimeUnit.MINUTES);
-        if (!q.getFlag()) {
+        QueryRedisListResult<ChatInfoVO> q1 = redisUtil.queryListWithCachePenetration(chatInfoKey, userId, ChatInfoVO.class, this::getChatListFromDB, null, chatInfoExpiration, TimeUnit.MINUTES);
+        if (!q1.getFlag()) {
             ChatInfoVO c = conformityChatInfo(chatInfo, userId);
-            List<ChatInfoVO> list = q.getData();
+            List<ChatInfoVO> list = q1.getData();
             for (int i = 0; i < list.size(); i++) {
                 if (list.get(i).getUserId().equals(c.getUserId())) {
                     list.set(i, c);
@@ -127,6 +130,21 @@ public class ChatServiceImpl implements ChatService {
             }
             redisUtil.set(chatInfoKey + userId, list, chatInfoExpiration, TimeUnit.MINUTES);
         }
+
+        // 修改对方的redis
+        QueryRedisListResult<ChatInfoVO> q2 = redisUtil.queryListWithCachePenetration(chatInfoKey, chatDTO.getToUserId(), ChatInfoVO.class, this::getChatListFromDB, null, chatInfoExpiration, TimeUnit.MINUTES);
+        if (!q2.getFlag()) {
+            ChatInfoVO c = conformityChatInfo(chatInfo, chatDTO.getToUserId());
+            List<ChatInfoVO> list = q2.getData();
+            for (int i = 0; i < list.size(); i++) {
+                if (list.get(i).getUserId().equals(c.getUserId())) {
+                    list.set(i, c);
+                    break;
+                }
+            }
+            redisUtil.set(chatInfoKey + chatDTO.getToUserId(), list, chatInfoExpiration, TimeUnit.MINUTES);
+        }
+
 
         // 整合chatContent并添加到redis中
         String singleChatContentKey = SystemConstant.REDIS_SINGLE_CHAT_CONTENT_KEY;
@@ -153,13 +171,17 @@ public class ChatServiceImpl implements ChatService {
             }
         }
 
+
         // 向用户或群组发送消息
         String message = JSONUtil.toJsonStr(chatContentVO);
         if (chatDTO.getIsSingleChat() == 1) {
-            webSocketServer.sentMessage(message, WebSocketConstant.USER_KEY + chatDTO.getToUserId()); // 给目标用户发送消息
-            webSocketServer.sentMessage(message, WebSocketConstant.USER_KEY + userId); // 给‘我’发送消息
+            webSocketChatServer.sentMessage(message, chatDTO.getToUserId().toString()); // 给目标用户发送消息
+            webSocketChatServer.sentMessage(message, userId.toString()); // 给‘我’发送消息
         } else {
-            webSocketServer.sentMessage(message, WebSocketConstant.GROUP_KEY + chatDTO.getGroupId()); // 给群组发送消息
+            List<Long> ids = chatMapper.getGroupMembers(chatDTO.getGroupId());
+            for (Long id : ids) {
+                webSocketChatServer.sentMessage(message, id.toString()); // 给群组发送消息
+            }
         }
     }
 
